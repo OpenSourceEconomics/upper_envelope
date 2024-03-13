@@ -1,11 +1,10 @@
 """Test the numba implementation of the fast upper envelope scan."""
-from functools import partial
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
+from upper_envelope.shared import process_function_args_to_kwargs
 from upper_envelope.upper_envelope_numba import fast_upper_envelope
 from upper_envelope.upper_envelope_numba import fast_upper_envelope_wrapper
 
@@ -24,7 +23,7 @@ def calc_current_value(
     next_period_value: np.ndarray,
     choice: int,
     discount_factor: float,
-    compute_utility: Callable,
+    compute_utility: callable,
 ) -> np.ndarray:
     """Compute the agent's current value.
 
@@ -87,16 +86,11 @@ def setup_model():
     params["rho"] = 1.95
     params["delta"] = 0.35
 
-    state_choice_vec = {"choice": 0}
+    state_choice_vec = {"choice": 0, "lagged_choice": 0}
 
-    compute_utility = partial(utility_crra, params=params)
-    compute_value = partial(
-        calc_current_value,
-        discount_factor=params["beta"],
-        compute_utility=compute_utility,
-    )
+    compute_utility = process_function_args_to_kwargs(utility_crra)
 
-    return params, state_choice_vec, exog_savings_grid, compute_utility, compute_value
+    return params, state_choice_vec, exog_savings_grid, compute_utility
 
 
 @pytest.mark.parametrize("period", [2, 4, 9, 10, 18])
@@ -125,22 +119,17 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         ~np.isnan(value_refined_fedor).any(axis=0),
     ]
 
-    (
-        _params,
-        state_choice_vec,
-        exog_savings_grid,
-        _compute_utility,
-        compute_value,
-    ) = setup_model
+    params, state_choice_vec, _exog_savings_grid, compute_utility = setup_model
 
     endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        exog_grid=np.append(0, exog_savings_grid),
-        choice=state_choice_vec["choice"],
-        compute_value=compute_value,
+        exog_grid=_exog_savings_grid,
+        state_choice_vec=state_choice_vec,
+        params=params,
+        compute_utility=compute_utility,
     )
     endog_grid_got = endog_grid_refined[~np.isnan(endog_grid_refined)]
     policy_got = policy_refined[~np.isnan(policy_refined)]
@@ -162,13 +151,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
         TEST_RESOURCES_DIR / "upper_envelope_period_tests/val10.csv", delimiter=","
     )
 
-    (
-        _params,
-        state_choice_vec,
-        exog_savings_grid,
-        compute_utility,
-        _compute_value,
-    ) = setup_model
+    _params, state_choice_vec, exog_savings_grid, compute_utility = setup_model
 
     endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
         endog_grid=policy_egm[0],
@@ -206,13 +189,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         delimiter=",",
     )
 
-    (
-        params,
-        state_choice_vec,
-        exog_savings_grid,
-        compute_utility,
-        compute_value,
-    ) = setup_model
+    params, state_choice_vec, exog_savings_grid, compute_utility = setup_model
 
     _policy_fedor, _value_fedor = upper_envelope(
         policy=policy_egm,
@@ -232,10 +209,11 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
-        expected_value_zero_savings=value_egm[1, 0],
         exog_grid=np.append(0, exog_savings_grid),
-        choice=state_choice_vec["choice"],
-        compute_value=compute_value,
+        expected_value_zero_savings=value_egm[1, 0],
+        state_choice_vec=state_choice_vec,
+        params=params,
+        compute_utility=compute_utility,
     )
     endog_grid_got = _endog_grid_fues[~np.isnan(_endog_grid_fues)]
     policy_got = _policy_fues[~np.isnan(_policy_fues)]
