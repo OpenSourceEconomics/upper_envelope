@@ -1,0 +1,44 @@
+---
+name: upper-envelope
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  - pytest
+  - pytest-cov
+  - pytest-xdist
+
+  # Package dependencies
+  - estimagic
+  - numpy
+  - scipy
+  - numba
+  - pandas
+  - jax
+  - networkx
+
+  # Misc
+  - black
+  - nb_black
+  - flake8
+  - jupyterlab
+  - matplotlib
+  - pdbpp
+  - pre-commit
+  - setuptools_scm
+  - toml
+
+  # Conda
+  - anaconda-client
+  - conda-build
+  - conda-verify
+  - tox-conda
+
+  - pip:
+      - blackcellmagic
+      - furo
+      - -e .  # Install locally
