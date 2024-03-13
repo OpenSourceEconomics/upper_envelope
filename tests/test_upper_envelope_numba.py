@@ -12,8 +12,6 @@ from upper_envelope.upper_envelope_numba import fast_upper_envelope_wrapper
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
 from tests.utils.upper_envelope_fedor import upper_envelope
 
-NUMBA_DISABLE_JIT = 1
-
 # Obtain the test directory of the package.
 TEST_DIR = Path(__file__).parent
 

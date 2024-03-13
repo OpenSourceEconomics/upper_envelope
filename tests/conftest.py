@@ -27,6 +27,16 @@ def pytest_sessionstart(session):  # noqa: ARG001
     jax.config.update("jax_enable_x64", val=True)
 
 
+def pytest_configure(config):
+    """Called after command line options have been parsed."""
+    os.environ["NUMBA_DISABLE_JIT"] = "1"
+
+
+def pytest_unconfigure(config):
+    """Called before test process is exited."""
+    os.environ.pop("NUMBA_DISABLE_JIT", None)
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
     # Get the current working directory
