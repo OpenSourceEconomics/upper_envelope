@@ -1,4 +1,4 @@
-"""Extension of the Fast Upper-Envelope Scan.
+"""Numba implementation and extension of the Fast Upper-Envelope Scan.
 
 The original algorithm is based on Loretti I. Dobrescu and Akshay Shanker (2022) 'Fast
 Upper-Envelope Scan for Solving Dynamic Optimization Problems',
