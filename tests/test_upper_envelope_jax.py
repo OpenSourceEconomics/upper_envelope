@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.interpolation import interpolate_policy_and_value_on_wealth_grid
 from upper_envelope.shared import determine_function_arguments_and_partial_options
 from upper_envelope.upper_envelope_jax import fast_upper_envelope
 from upper_envelope.upper_envelope_jax import (
@@ -14,6 +13,7 @@ from upper_envelope.upper_envelope_jax import (
 )
 
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
+from tests.utils.interpolation import interpolate_policy_and_value_on_wealth_grid
 from tests.utils.interpolations import linear_interpolation_with_extrapolation
 from tests.utils.upper_envelope_fedor import upper_envelope
 
