@@ -1,19 +1,15 @@
+"""Test the numba implementation of the fast upper envelope scan."""
+from functools import partial
 from pathlib import Path
-from typing import Dict
+from typing import Callable
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.fast_upper_envelope import fast_upper_envelope
-from upper_envelope.fast_upper_envelope import (
-    fast_upper_envelope_wrapper,
-)
-from upper_envelope.interpolation import interpolate_policy_and_value_on_wealth_grid
-from upper_envelope.shared import determine_function_arguments_and_partial_options
+from upper_envelope.upper_envelope_numba import fast_upper_envelope
+from upper_envelope.upper_envelope_numba import fast_upper_envelope_wrapper
 
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
-from tests.utils.interpolations import linear_interpolation_with_extrapolation
 from tests.utils.upper_envelope_fedor import upper_envelope
 
 # Obtain the test directory of the package.
@@ -23,11 +19,38 @@ TEST_DIR = Path(__file__).parent
 TEST_RESOURCES_DIR = TEST_DIR / "resources"
 
 
-def utility_crra(
-    consumption: jnp.array,
+def calc_current_value(
+    consumption: np.ndarray,
+    next_period_value: np.ndarray,
     choice: int,
-    params: Dict[str, float],
-) -> jnp.array:
+    discount_factor: float,
+    compute_utility: Callable,
+) -> np.ndarray:
+    """Compute the agent's current value.
+
+    We only support the standard value function, where the current utility and
+    the discounted next period value have a sum format.
+
+    Args:
+        consumption (np.ndarray): Level of the agent's consumption.
+            Array of shape (n_quad_stochastic * n_grid_wealth,).
+        next_period_value (np.ndarray): The value in the next period.
+        choice (int): The current discrete choice.
+        compute_utility (callable): User-defined function to compute the agent's
+            utility. The input ``params``` is already partialled in.
+        discount_factor (float): The discount factor.
+
+    Returns:
+        np.ndarray: The current value.
+
+    """
+    utility = compute_utility(consumption, choice)
+    value = utility + discount_factor * next_period_value
+
+    return value
+
+
+def utility_crra(consumption: np.array, choice: int, params: dict) -> np.array:
     """Computes the agent's current utility based on a CRRA utility function.
 
     Args:
@@ -38,7 +61,7 @@ def utility_crra(
             (ii) of shape (n_grid_wealth,) when called by
             :func:`~dcgm.call_egm_step.get_current_period_value`.
         choice (int): Choice of the agent, e.g. 0 = "retirement", 1 = "working".
-        params (dict): Dictionary containing model parameters.
+        params_dict (dict): Dictionary containing model parameters.
             Relevant here is the CRRA coefficient theta.
 
     Returns:
@@ -46,7 +69,6 @@ def utility_crra(
             (n_quad_stochastic * n_grid_wealth,) or (n_grid_wealth,).
 
     """
-
     utility_consumption = (consumption ** (1 - params["rho"]) - 1) / (1 - params["rho"])
 
     utility = utility_consumption - (1 - choice) * params["delta"]
@@ -65,25 +87,16 @@ def setup_model():
     params["rho"] = 1.95
     params["delta"] = 0.35
 
-    options = {
-        "state_space": {
-            "endogenous_states": {
-                "period": np.arange(2),
-                "lagged_choice": [0, 1],
-            },
-            "choice": [0, 1],
-        },
-        "model_params": {"min_age": 50, "max_age": 80, "n_periods": 25, "n_choices": 2},
-    }
+    state_choice_vec = {"choice": 0}
 
-    state_choice_vars = {"lagged_choice": 0, "choice": 0}
-
-    options["state_space"]["exogenous_states"] = {"exog_state": [0]}
-    compute_utility = determine_function_arguments_and_partial_options(
-        utility_crra, options=options
+    compute_utility = partial(utility_crra, params=params)
+    compute_value = partial(
+        calc_current_value,
+        discount_factor=params["beta"],
+        compute_utility=compute_utility,
     )
 
-    return params, exog_savings_grid, state_choice_vars, compute_utility
+    return params, state_choice_vec, exog_savings_grid, compute_utility, compute_value
 
 
 @pytest.mark.parametrize("period", [2, 4, 9, 10, 18])
@@ -112,49 +125,33 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         ~np.isnan(value_refined_fedor).any(axis=0),
     ]
 
-    params, _exog_savings_grid, state_choice_vars, compute_utility = setup_model
-
     (
-        endog_grid_refined,
-        policy_left_refined,
-        policy_right_refined,
-        value_refined,
-    ) = fast_upper_envelope_wrapper(
+        _params,
+        state_choice_vec,
+        exog_savings_grid,
+        _compute_utility,
+        compute_value,
+    ) = setup_model
+
+    endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        state_choice_vec=state_choice_vars,
-        params=params,
-        compute_utility=compute_utility,
+        exog_grid=np.append(0, exog_savings_grid),
+        choice=state_choice_vec["choice"],
+        compute_value=compute_value,
     )
+    endog_grid_got = endog_grid_refined[~np.isnan(endog_grid_refined)]
+    policy_got = policy_refined[~np.isnan(policy_refined)]
+    value_got = value_refined[~np.isnan(value_refined)]
 
-    wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
-    wealth_grid_to_test = jnp.linspace(
-        endog_grid_refined[1], wealth_max_to_test, 1000, dtype=float
+    aaae(endog_grid_got, policy_expected[0])
+    aaae(policy_got, policy_expected[1])
+    value_expected_interp = np.interp(
+        endog_grid_got, value_expected[0], value_expected[1]
     )
-
-    value_expec_interp = linear_interpolation_with_extrapolation(
-        x_new=wealth_grid_to_test, x=value_expected[0], y=value_expected[1]
-    )
-
-    policy_expec_interp = linear_interpolation_with_extrapolation(
-        x_new=wealth_grid_to_test, x=policy_expected[0], y=policy_expected[1]
-    )
-
-    (
-        policy_calc_interp,
-        value_calc_interp,
-    ) = interpolate_policy_and_value_on_wealth_grid(
-        wealth_beginning_of_period=wealth_grid_to_test,
-        endog_wealth_grid=endog_grid_refined,
-        policy_left_grid=policy_left_refined,
-        policy_right_grid=policy_right_refined,
-        value_grid=value_refined,
-    )
-
-    aaae(value_calc_interp, value_expec_interp)
-    aaae(policy_calc_interp, policy_expec_interp)
+    aaae(value_got, value_expected_interp)
 
 
 def test_fast_upper_envelope_against_org_fues(setup_model):
@@ -164,19 +161,20 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
     value_egm = np.genfromtxt(
         TEST_RESOURCES_DIR / "upper_envelope_period_tests/val10.csv", delimiter=","
     )
-    _params, exog_savings_grid, state_choice_vars, compute_utility = setup_model
 
     (
-        endog_grid_refined,
-        value_refined,
-        policy_left_refined,
-        policy_right_refined,
-    ) = fast_upper_envelope(
-        endog_grid=policy_egm[0, 1:],
-        value=value_egm[1, 1:],
-        policy=policy_egm[1, 1:],
-        expected_value_zero_savings=value_egm[1, 0],
-        num_iter=int(1.2 * value_egm.shape[1]),
+        _params,
+        state_choice_vec,
+        exog_savings_grid,
+        compute_utility,
+        _compute_value,
+    ) = setup_model
+
+    endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
+        endog_grid=policy_egm[0],
+        value=value_egm[1],
+        policy=policy_egm[1],
+        exog_grid=np.append(0, exog_savings_grid),
     )
 
     endog_grid_org, policy_org, value_org = fast_upper_envelope_wrapper_org(
@@ -184,7 +182,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
         policy=policy_egm[1],
         value=value_egm[1],
         exog_grid=exog_savings_grid,
-        choice=state_choice_vars["choice"],
+        choice=state_choice_vec["choice"],
         compute_utility=compute_utility,
     )
 
@@ -193,7 +191,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
     value_expected = value_org[~np.isnan(value_org)]
 
     assert np.all(np.in1d(endog_grid_expected, endog_grid_refined))
-    assert np.all(np.in1d(policy_expected, policy_right_refined))
+    assert np.all(np.in1d(policy_expected, policy_refined))
     assert np.all(np.in1d(value_expected, value_refined))
 
 
@@ -208,7 +206,13 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         delimiter=",",
     )
 
-    params, exog_savings_grid, state_choice_vec, compute_utility = setup_model
+    (
+        params,
+        state_choice_vec,
+        exog_savings_grid,
+        compute_utility,
+        compute_value,
+    ) = setup_model
 
     _policy_fedor, _value_fedor = upper_envelope(
         policy=policy_egm,
@@ -224,40 +228,22 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         ~np.isnan(_value_fedor).any(axis=0),
     ]
 
-    (
-        endog_grid_calc,
-        policy_calc_left,
-        policy_calc_right,
-        value_calc,
-    ) = fast_upper_envelope_wrapper(
+    _endog_grid_fues, _policy_fues, _value_fues = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        state_choice_vec=state_choice_vec,
-        params=params,
-        compute_utility=compute_utility,
+        exog_grid=np.append(0, exog_savings_grid),
+        choice=state_choice_vec["choice"],
+        compute_value=compute_value,
     )
-    wealth_max_to_test = np.max(endog_grid_calc[~np.isnan(endog_grid_calc)]) + 100
-    wealth_grid_to_test = np.linspace(endog_grid_calc[1], wealth_max_to_test, 1000)
+    endog_grid_got = _endog_grid_fues[~np.isnan(_endog_grid_fues)]
+    policy_got = _policy_fues[~np.isnan(_policy_fues)]
+    value_got = _value_fues[~np.isnan(_value_fues)]
 
-    value_expec_interp = linear_interpolation_with_extrapolation(
-        x_new=wealth_grid_to_test, x=value_expected[0], y=value_expected[1]
+    aaae(endog_grid_got, policy_expected[0])
+    aaae(policy_got, policy_expected[1])
+    value_expected_interp = np.interp(
+        endog_grid_got, value_expected[0], value_expected[1]
     )
-
-    policy_expec_interp = linear_interpolation_with_extrapolation(
-        x_new=wealth_grid_to_test, x=policy_expected[0], y=policy_expected[1]
-    )
-
-    (
-        policy_calc_interp,
-        value_calc_interp,
-    ) = interpolate_policy_and_value_on_wealth_grid(
-        wealth_beginning_of_period=wealth_grid_to_test,
-        endog_wealth_grid=endog_grid_calc,
-        policy_left_grid=policy_calc_left,
-        policy_right_grid=policy_calc_right,
-        value_grid=value_calc,
-    )
-    aaae(value_calc_interp, value_expec_interp)
-    aaae(policy_calc_interp, policy_expec_interp)
+    aaae(value_got, value_expected_interp)
