@@ -15,6 +15,7 @@ coverage:
         target: 90%
 ignore:
   - setup.py
+  - src/upper_envelope/shared.py
   - tests/*
   - tests/**/*
   - .tox/**/*
