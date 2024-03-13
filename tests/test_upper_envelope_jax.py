@@ -1,3 +1,4 @@
+"""Test the JAX implementation of the fast upper envelope scan."""
 from pathlib import Path
 from typing import Dict
 

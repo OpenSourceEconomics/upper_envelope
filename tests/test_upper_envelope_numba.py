@@ -1,3 +1,4 @@
+"""Test the numba implementation of the fast upper envelope scan."""
 from functools import partial
 from pathlib import Path
 from typing import Callable
