@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.shared import determine_function_arguments_and_partial_options
+from upper_envelope.shared import process_function_args_to_kwargs
 from upper_envelope.upper_envelope_jax import fast_upper_envelope
 from upper_envelope.upper_envelope_jax import (
     fast_upper_envelope_wrapper,
@@ -80,9 +80,8 @@ def setup_model():
     state_choice_vars = {"lagged_choice": 0, "choice": 0}
 
     options["state_space"]["exogenous_states"] = {"exog_state": [0]}
-    compute_utility = determine_function_arguments_and_partial_options(
-        utility_crra, options=options
-    )
+
+    compute_utility = process_function_args_to_kwargs(utility_crra)
 
     return params, exog_savings_grid, state_choice_vars, compute_utility
 
