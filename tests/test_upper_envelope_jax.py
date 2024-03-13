@@ -14,7 +14,7 @@ from upper_envelope.upper_envelope_jax import (
 
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
 from tests.utils.interpolation import interpolate_policy_and_value_on_wealth_grid
-from tests.utils.interpolations import linear_interpolation_with_extrapolation
+from tests.utils.interpolation import linear_interpolation_with_extrapolation
 from tests.utils.upper_envelope_fedor import upper_envelope
 
 # Obtain the test directory of the package.
@@ -244,7 +244,6 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
     value_expec_interp = linear_interpolation_with_extrapolation(
         x_new=wealth_grid_to_test, x=value_expected[0], y=value_expected[1]
     )
-
     policy_expec_interp = linear_interpolation_with_extrapolation(
         x_new=wealth_grid_to_test, x=policy_expected[0], y=policy_expected[1]
     )

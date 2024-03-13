@@ -12,12 +12,8 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import brenth as root
 
-from tests.utils.interpolations import linear_interpolation_with_extrapolation
-from tests.utils.interpolations import (
-    linear_interpolation_with_inserting_missing_values,
-)
 
-eps = 2.2204e-16
+EPS = 2.2204e-16
 
 
 def upper_envelope(
@@ -247,7 +243,7 @@ def compute_upper_envelope(
 
     values_interp = np.empty((len(segments), len(endog_wealth_grid)))
     for i, segment in enumerate(segments):
-        values_interp[i, :] = linear_interpolation_with_inserting_missing_values(
+        values_interp[i, :] = _linear_interpolation_with_inserting_missing_values(
             x=segment[0],
             y=segment[1],
             x_new=endog_wealth_grid,
@@ -280,7 +276,7 @@ def compute_upper_envelope(
                 second_grid_point = endog_wealth_grid[i]
 
                 values_first_segment = (
-                    linear_interpolation_with_inserting_missing_values(
+                    _linear_interpolation_with_inserting_missing_values(
                         x=segments[first_segment][0],
                         y=segments[first_segment][1],
                         x_new=np.array([first_grid_point, second_grid_point]),
@@ -288,7 +284,7 @@ def compute_upper_envelope(
                     )
                 )
                 values_second_segment = (
-                    linear_interpolation_with_inserting_missing_values(
+                    _linear_interpolation_with_inserting_missing_values(
                         x=segments[second_segment][0],
                         y=segments[second_segment][1],
                         x_new=np.array([first_grid_point, second_grid_point]),
@@ -311,7 +307,7 @@ def compute_upper_envelope(
                         ),
                     )
                     value_intersect = (
-                        linear_interpolation_with_inserting_missing_values(
+                        _linear_interpolation_with_inserting_missing_values(
                             x=segments[first_segment][0],
                             y=segments[first_segment][1],
                             x_new=np.array([intersect_point]),
@@ -323,7 +319,7 @@ def compute_upper_envelope(
                     for segment in range(len(segments)):
                         values_all_segments[
                             segment
-                        ] = linear_interpolation_with_inserting_missing_values(
+                        ] = _linear_interpolation_with_inserting_missing_values(
                             x=segments[segment][0],
                             y=segments[segment][1],
                             x_new=np.array([intersect_point]),
@@ -351,7 +347,7 @@ def compute_upper_envelope(
 
             # Add point if it lies currently on the highest segment
             if (
-                any(abs(segments[index_second_segment][0] - endog_wealth_grid[i]) < eps)
+                any(abs(segments[index_second_segment][0] - endog_wealth_grid[i]) < EPS)
                 is True
             ):
                 grid_points_upper_env.append(endog_wealth_grid[i])
@@ -461,7 +457,7 @@ def refine_policy(
         )
 
         # Find (scalar) point interpolated from the left
-        interp_from_the_left = linear_interpolation_with_extrapolation(
+        interp_from_the_left = _linear_interpolation_with_extrapolation(
             x=policy[0, :][last_point_to_the_left : last_point_to_the_left + 2],
             y=policy[1, :][last_point_to_the_left : last_point_to_the_left + 2],
             x_new=points_to_add[0][new_grid_point],
@@ -474,7 +470,7 @@ def refine_policy(
         )
 
         # Find (scalar) point interpolated from the right
-        interp_from_the_right = linear_interpolation_with_extrapolation(
+        interp_from_the_right = _linear_interpolation_with_extrapolation(
             x=policy[0, :][first_point_to_the_right - 1 : first_point_to_the_right + 1],
             y=policy[1, :][first_point_to_the_right - 1 : first_point_to_the_right + 1],
             x_new=points_to_add[0, new_grid_point],
@@ -641,13 +637,77 @@ def _partition_grid(
 
 def _subtract_values(grid_point: float, first_segment, second_segment):
     """Subtracts the interpolated values of the two uppermost segments."""
-    values_first_segment = linear_interpolation_with_extrapolation(
+    values_first_segment = _linear_interpolation_with_extrapolation(
         x=first_segment[0], y=first_segment[1], x_new=grid_point
     )
-    values_second_segment = linear_interpolation_with_extrapolation(
+    values_second_segment = _linear_interpolation_with_extrapolation(
         x=second_segment[0], y=second_segment[1], x_new=grid_point
     )
 
     diff_values_segments = values_first_segment - values_second_segment
 
     return diff_values_segments
+
+
+def _linear_interpolation_with_extrapolation(x, y, x_new):
+    """Linear interpolation with extrapolation.
+
+    Args:
+        x (np.ndarray): 1d array of shape (n,) containing the x-values.
+        y (np.ndarray): 1d array of shape (n,) containing the y-values
+            corresponding to the x-values.
+        x_new (np.ndarray or float): 1d array of shape (m,) or float containing
+            the new x-values at which to evaluate the interpolation function.
+
+    Returns:
+        np.ndarray or float: 1d array of shape (m,) or float containing
+            the new y-values corresponding to the new x-values.
+            In case x_new contains values outside of the range of x, these
+            values are extrapolated.
+
+    """
+    # make sure that the function also works for unsorted x-arrays
+    # taken from scipy.interpolate.interp1d
+    ind = np.argsort(x, kind="mergesort")
+    x = x[ind]
+    y = np.take(y, ind)
+
+    ind_high = np.searchsorted(x, x_new).clip(max=(x.shape[0] - 1), min=1)
+    ind_low = ind_high - 1
+
+    y_high = y[ind_high]
+    y_low = y[ind_low]
+    x_high = x[ind_high]
+    x_low = x[ind_low]
+
+    interpolate_dist = x_new - x_low
+    interpolate_slope = (y_high - y_low) / (x_high - x_low)
+    interpol_res = (interpolate_slope * interpolate_dist) + y_low
+
+    return interpol_res
+
+
+def _linear_interpolation_with_inserting_missing_values(x, y, x_new, missing_value):
+    """Linear interpolation with inserting missing values.
+
+    Args:
+        x (np.ndarray): 1d array of shape (n,) containing the x-values.
+        y (np.ndarray): 1d array of shape (n,) containing the y-values
+            corresponding to the x-values.
+        x_new (np.ndarray or float): 1d array of shape (m,) or float containing
+            the new x-values at which to evaluate the interpolation function.
+        missing_value (np.ndarray or float): Flat array of shape (1,) or float
+            to set for values of x_new outside of the range of x.
+
+    Returns:
+        np.ndarray or float: 1d array of shape (m,) or float containing the
+            new y-values corresponding to the new x-values.
+            In case x_new contains values outside of the range of x, these
+            values are set equal to missing_value.
+
+    """
+    interpol_res = _linear_interpolation_with_extrapolation(x, y, x_new)
+    where_to_miss = (x_new < x.min()) | (x_new > x.max())
+    interpol_res[where_to_miss] = missing_value
+
+    return interpol_res
