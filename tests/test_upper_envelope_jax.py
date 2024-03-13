@@ -225,10 +225,10 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
     ]
 
     (
-        endog_grid_calc,
-        policy_calc_left,
-        policy_calc_right,
-        value_calc,
+        endog_grid_fues,
+        policy_fues_left,
+        policy_fues_right,
+        value_fues,
     ) = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
@@ -238,8 +238,9 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         params=params,
         compute_utility=compute_utility,
     )
-    wealth_max_to_test = np.max(endog_grid_calc[~np.isnan(endog_grid_calc)]) + 100
-    wealth_grid_to_test = np.linspace(endog_grid_calc[1], wealth_max_to_test, 1000)
+
+    wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100
+    wealth_grid_to_test = np.linspace(endog_grid_fues[1], wealth_max_to_test, 1000)
 
     value_expec_interp = linear_interpolation_with_extrapolation(
         x_new=wealth_grid_to_test, x=value_expected[0], y=value_expected[1]
@@ -248,15 +249,12 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         x_new=wealth_grid_to_test, x=policy_expected[0], y=policy_expected[1]
     )
 
-    (
-        policy_calc_interp,
-        value_calc_interp,
-    ) = interpolate_policy_and_value_on_wealth_grid(
+    policy_interp, value_interp = interpolate_policy_and_value_on_wealth_grid(
         wealth_beginning_of_period=wealth_grid_to_test,
-        endog_wealth_grid=endog_grid_calc,
-        policy_left_grid=policy_calc_left,
-        policy_right_grid=policy_calc_right,
-        value_grid=value_calc,
+        endog_wealth_grid=endog_grid_fues,
+        policy_left_grid=policy_fues_left,
+        policy_right_grid=policy_fues_right,
+        value_grid=value_fues,
     )
-    aaae(value_calc_interp, value_expec_interp)
-    aaae(policy_calc_interp, policy_expec_interp)
+    aaae(value_interp, value_expec_interp)
+    aaae(policy_interp, policy_expec_interp)

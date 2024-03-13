@@ -74,6 +74,9 @@ def fast_upper_envelope_wrapper(
     """
     n_grid_wealth = len(endog_grid)
     min_wealth_grid = np.min(endog_grid)
+    # exog_grid = np.append(
+    #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
+    # )
 
     if endog_grid[0] > min_wealth_grid:
         # Non-concave region coincides with credit constraint.
