@@ -1,7 +1,7 @@
 """Numba implementation of the Fast Upper-Envelope Scan (FUES).
 
 The original FUES algorithm is based on Loretti I. Dobrescu and Akshay Shanker (2022)
-'Fast Upper-Envelope Scan for Solving Dynamic Optimization Problems',
+'Fast Upper-Envelope Scan for Discrete-Continuous Dynamic Programming',
 https://dx.doi.org/10.2139/ssrn.4181302
 
 """
