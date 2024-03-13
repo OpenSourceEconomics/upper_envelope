@@ -18,7 +18,7 @@ repos:
     hooks:
       - id: check-added-large-files
         args:
-          - --maxkb=200
+          - --maxkb=500
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-vcs-permalinks
@@ -61,11 +61,11 @@ repos:
     rev: v0.0.282
     hooks:
       - id: ruff
-        exclude: |
-          (?x)^(
-            tests/|
-            docs/source/conf.py|
-          )$
+        # exclude: |
+        #   (?x)^(
+        #     tests/|
+        #     docs/source/conf.py|
+        #   )$
   - repo: https://github.com/PyCQA/docformatter
     rev: v1.7.5
     hooks:
@@ -83,7 +83,6 @@ repos:
     hooks:
       - id: nbqa-black
       - id: nbqa-ruff
-        exclude: tests/sandbox/
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.16
     hooks:
@@ -101,7 +100,6 @@ repos:
       - id: codespell
         additional_dependencies:
           - tomli
-        exclude: tests/sandbox/
 # -   repo: https://github.com/mgedmin/check-manifest
 #     rev: "0.49"
 #     hooks:
