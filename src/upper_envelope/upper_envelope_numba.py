@@ -6,6 +6,7 @@ https://dx.doi.org/10.2139/ssrn.4181302
 
 """
 from typing import Callable
+from typing import Dict
 from typing import Optional
 from typing import Tuple
 
@@ -19,8 +20,9 @@ def fast_upper_envelope_wrapper(
     value: np.ndarray,
     exog_grid: np.ndarray,
     expected_value_zero_savings: float,
-    choice: int,
-    compute_value: Callable,
+    state_choice_vec: np.ndarray,
+    params: Dict[str, float],
+    compute_utility: Callable,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop suboptimal points and refine the endogenous grid, policy, and value.
 
@@ -57,7 +59,7 @@ def fast_upper_envelope_wrapper(
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
         choice (int): The current choice.
-        compute_value (callable): Function to compute the agent's value.
+        compute_utility (callable): Function to compute the agent's utility.
 
     Returns:
         tuple:
@@ -70,8 +72,12 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    n_grid_wealth = len(exog_grid)
+    n_grid_wealth = len(endog_grid)
     min_wealth_grid = np.min(endog_grid)
+    # exog_grid = np.append(
+    #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
+    # )
+
     if endog_grid[0] > min_wealth_grid:
         # Non-concave region coincides with credit constraint.
         # This happens when there is a non-monotonicity in the endogenous wealth grid
@@ -83,11 +89,12 @@ def fast_upper_envelope_wrapper(
             endog_grid=endog_grid,
             value=value,
             policy=policy,
-            choice=choice,
+            state_choice_vec=state_choice_vec,
             expected_value_zero_savings=expected_value_zero_savings,
             min_wealth_grid=min_wealth_grid,
             n_grid_wealth=n_grid_wealth,
-            compute_value=compute_value,
+            params=params,
+            compute_utility=compute_utility,
         )
         exog_grid = np.append(np.zeros(n_grid_wealth // 10 - 1), exog_grid)
 
@@ -725,11 +732,12 @@ def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    choice: int,
+    state_choice_vec: np.ndarray,
     expected_value_zero_savings: np.ndarray,
     min_wealth_grid: float,
     n_grid_wealth: int,
-    compute_value: Callable,
+    compute_utility: Callable,
+    params: Dict[str, float],
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extends the endogenous wealth grid, value, and policy functions to the left.
 
@@ -753,9 +761,8 @@ def _augment_grids(
         choice (int): The agent's choice.
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        min_wealth_grid (float): Minimal wealth level in the endogenous wealth grid.
         n_grid_wealth (int): Number of grid points in the exogenous wealth grid.
-        compute_value (callable): Function to compute the agent's value.
+        compute_utility (callable): Function to compute the agent's utility.
 
     Returns:
         tuple:
@@ -772,12 +779,14 @@ def _augment_grids(
         min_wealth_grid, endog_grid[0], n_grid_wealth // 10
     )[:-1]
 
-    grid_augmented = np.append(grid_points_to_add, endog_grid)
-    values_to_add = compute_value(
-        grid_points_to_add,
-        expected_value_zero_savings,
-        choice,
+    utility = compute_utility(
+        consumption=grid_points_to_add,
+        params=params,
+        **state_choice_vec,
     )
+    values_to_add = utility + params["beta"] * expected_value_zero_savings
+
+    grid_augmented = np.append(grid_points_to_add, endog_grid)
     value_augmented = np.append(values_to_add, value)
     policy_augmented = np.append(grid_points_to_add, policy)
 

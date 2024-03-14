@@ -1,7 +1,7 @@
 """Jax implementation of the extended Fast Upper-Envelope Scan (FUES).
 
 The original FUES algorithm is based on Loretti I. Dobrescu and Akshay Shanker (2022)
-'Fast Upper-Envelope Scan for Discrete-Continuous Dynamic Programming',
+'Fast Upper-Envelope Scan for Solving Dynamic Optimization Problems',
 https://dx.doi.org/10.2139/ssrn.4181302
 
 """
@@ -63,7 +63,7 @@ def fast_upper_envelope_wrapper(
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
         choice (int): The current choice.
-        compute_value (callable): Function to compute the agent's value.
+        compute_value (callable): Function to compute the agent's utility.
         params (dict): Dictionary containing the model parameters.
 
     Returns:
@@ -126,17 +126,6 @@ def fast_upper_envelope_wrapper(
         policy_right_refined,
         value_refined,
     )
-
-
-def _compute_value(
-    consumption, next_period_value, state_choice_vec, params, compute_utility
-):
-    utility = compute_utility(
-        consumption=consumption,
-        params=params,
-        **state_choice_vec,
-    )
-    return utility + params["beta"] * next_period_value
 
 
 def fast_upper_envelope(
@@ -1367,3 +1356,14 @@ def create_indicator_if_value_function_is_switched(
     is_switched = gradient_exog_abs > jump_thresh
 
     return is_switched
+
+
+def _compute_value(
+    consumption, next_period_value, state_choice_vec, params, compute_utility
+):
+    utility = compute_utility(
+        consumption=consumption,
+        params=params,
+        **state_choice_vec,
+    )
+    return utility + params["beta"] * next_period_value
