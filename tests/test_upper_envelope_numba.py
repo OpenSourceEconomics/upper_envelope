@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.shared import process_function_args_to_kwargs
 from upper_envelope.upper_envelope_numba import fast_upper_envelope
 from upper_envelope.upper_envelope_numba import fast_upper_envelope_wrapper
 
@@ -59,9 +58,8 @@ def setup_model():
 
     state_choice_vec = {"choice": 0, "lagged_choice": 0}
 
-    compute_utility = process_function_args_to_kwargs(utility_crra)
 
-    return params, state_choice_vec, exog_savings_grid, compute_utility
+    return params, state_choice_vec, exog_savings_grid
 
 
 @pytest.mark.parametrize("period", [2, 4, 9, 10, 18])
@@ -90,7 +88,13 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         ~np.isnan(value_refined_fedor).any(axis=0),
     ]
 
-    params, state_choice_vec, _exog_savings_grid, compute_utility = setup_model
+    params, state_choice_vec, _exog_savings_grid = setup_model
+
+    utility_kwargs = {
+        "choice": state_choice_vec["choice"],
+        "params": params,
+    }
+
 
     endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
@@ -98,9 +102,9 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
         exog_grid=_exog_savings_grid,
-        state_choice_vec=state_choice_vec,
-        params=params,
-        compute_utility=compute_utility,
+        utility_function=utility_crra,
+        utility_kwargs=utility_kwargs,
+        discount_factor=params["beta"],
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -138,7 +142,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
         TEST_RESOURCES_DIR / "upper_envelope_period_tests/val10.csv", delimiter=","
     )
 
-    _params, state_choice_vec, exog_savings_grid, compute_utility = setup_model
+    _params, state_choice_vec, exog_savings_grid = setup_model
 
     endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
         endog_grid=policy_egm[0],
@@ -153,7 +157,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
         value=value_egm[1],
         exog_grid=exog_savings_grid,
         choice=state_choice_vec["choice"],
-        compute_utility=compute_utility,
+        compute_utility=utility_crra,
     )
 
     endog_grid_expected = endog_grid_org[~np.isnan(endog_grid_org)]
@@ -176,21 +180,27 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         delimiter=",",
     )
 
-    params, state_choice_vec, exog_savings_grid, compute_utility = setup_model
+    params, state_choice_vec, exog_savings_grid = setup_model
 
     _policy_fedor, _value_fedor = upper_envelope(
         policy=policy_egm,
         value=value_egm,
         exog_grid=exog_savings_grid,
-        state_choice_vec=state_choice_vec,
+        state_choice_vec={"choice":state_choice_vec["choice"]},
         params=params,
-        compute_utility=compute_utility,
+        compute_utility=utility_crra,
     )
     policy_expected = _policy_fedor[:, ~np.isnan(_policy_fedor).any(axis=0)]
     value_expected = _value_fedor[
         :,
         ~np.isnan(_value_fedor).any(axis=0),
     ]
+    utility_kwargs = {
+        "choice": state_choice_vec["choice"],
+        "params": params,
+    }
+
+
 
     endog_grid_fues, policy_fues, value_fues = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
@@ -198,9 +208,9 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         value=value_egm[1, 1:],
         exog_grid=np.append(0, exog_savings_grid),
         expected_value_zero_savings=value_egm[1, 0],
-        state_choice_vec=state_choice_vec,
-        params=params,
-        compute_utility=compute_utility,
+        utility_function=utility_crra,
+        utility_kwargs=utility_kwargs,
+        discount_factor=params["beta"],
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100

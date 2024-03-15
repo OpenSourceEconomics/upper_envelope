@@ -26,9 +26,9 @@ def fast_upper_envelope_wrapper(
     policy: jnp.ndarray,
     value: jnp.ndarray,
     expected_value_zero_savings: float,
-    state_choice_vec: jnp.ndarray,
-    params: Dict[str, float],
-    compute_utility: Callable,
+    utility_function: Callable,
+    utility_kwargs: Dict,
+    disc_factor: float,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Drop suboptimal points and refines the endogenous grid, policy, and value.
 
@@ -62,9 +62,10 @@ def fast_upper_envelope_wrapper(
             containing the current state- and choice-specific value function.
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        choice (int): The current choice.
-        compute_value (callable): Function to compute the agent's utility.
-        params (dict): Dictionary containing the model parameters.
+        utility_function (callable): The utility function. The first argument is
+            assumed to be consumption.
+        utility_kwargs (dict): The keyword arguments to be passed to the utility
+            function.
 
     Returns:
         tuple:
@@ -98,9 +99,9 @@ def fast_upper_envelope_wrapper(
     values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
         grid_points_to_add,
         expected_value_zero_savings,
-        state_choice_vec,
-        params,
-        compute_utility,
+        utility_function,
+        utility_kwargs,
+        disc_factor
     )
 
     grid_augmented = jnp.append(grid_points_to_add, endog_grid)
@@ -1359,11 +1360,10 @@ def create_indicator_if_value_function_is_switched(
 
 
 def _compute_value(
-    consumption, next_period_value, state_choice_vec, params, compute_utility
+    consumption, next_period_value, utility_function, utility_kwargs, discount_factor
 ):
-    utility = compute_utility(
-        consumption=consumption,
-        params=params,
-        **state_choice_vec,
+    utility = utility_function(
+        consumption,
+        **utility_kwargs,
     )
-    return utility + params["beta"] * next_period_value
+    return utility + discount_factor * next_period_value
