@@ -215,7 +215,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         policy=policy_egm,
         value=value_egm,
         exog_grid=exog_savings_grid,
-        state_choice_vec={"choice":state_choice_vec["choice"]},
+        state_choice_vec={"choice": state_choice_vec["choice"]},
         params=params,
         compute_utility=utility_crra,
     )

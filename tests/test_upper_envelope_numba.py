@@ -58,7 +58,6 @@ def setup_model():
 
     state_choice_vec = {"choice": 0, "lagged_choice": 0}
 
-
     return params, state_choice_vec, exog_savings_grid
 
 
@@ -94,7 +93,6 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         "choice": state_choice_vec["choice"],
         "params": params,
     }
-
 
     endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
@@ -186,7 +184,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         policy=policy_egm,
         value=value_egm,
         exog_grid=exog_savings_grid,
-        state_choice_vec={"choice":state_choice_vec["choice"]},
+        state_choice_vec={"choice": state_choice_vec["choice"]},
         params=params,
         compute_utility=utility_crra,
     )
@@ -199,8 +197,6 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         "choice": state_choice_vec["choice"],
         "params": params,
     }
-
-
 
     endog_grid_fues, policy_fues, value_fues = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],

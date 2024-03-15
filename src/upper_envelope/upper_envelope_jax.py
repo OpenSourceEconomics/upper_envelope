@@ -101,7 +101,7 @@ def fast_upper_envelope_wrapper(
         expected_value_zero_savings,
         utility_function,
         utility_kwargs,
-        disc_factor
+        disc_factor,
     )
 
     grid_augmented = jnp.append(grid_points_to_add, endog_grid)
