@@ -20,9 +20,9 @@ def fast_upper_envelope_wrapper(
     value: np.ndarray,
     exog_grid: np.ndarray,
     expected_value_zero_savings: float,
-    state_choice_vec: np.ndarray,
-    params: Dict[str, float],
-    compute_utility: Callable,
+    utility_function: Callable,
+    utility_kwargs: Dict,
+    discount_factor: float,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop suboptimal points and refine the endogenous grid, policy, and value.
 
@@ -89,12 +89,12 @@ def fast_upper_envelope_wrapper(
             endog_grid=endog_grid,
             value=value,
             policy=policy,
-            state_choice_vec=state_choice_vec,
             expected_value_zero_savings=expected_value_zero_savings,
             min_wealth_grid=min_wealth_grid,
             n_grid_wealth=n_grid_wealth,
-            params=params,
-            compute_utility=compute_utility,
+            utility_function=utility_function,
+            utility_kwargs=utility_kwargs,
+            discount_factor=discount_factor,
         )
         exog_grid = np.append(np.zeros(n_grid_wealth // 10 - 1), exog_grid)
 
@@ -732,12 +732,12 @@ def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    state_choice_vec: np.ndarray,
     expected_value_zero_savings: np.ndarray,
     min_wealth_grid: float,
     n_grid_wealth: int,
-    compute_utility: Callable,
-    params: Dict[str, float],
+    utility_function: Callable,
+    utility_kwargs: Dict[str, float],
+    discount_factor: float,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extends the endogenous wealth grid, value, and policy functions to the left.
 
@@ -779,12 +779,11 @@ def _augment_grids(
         min_wealth_grid, endog_grid[0], n_grid_wealth // 10
     )[:-1]
 
-    utility = compute_utility(
-        consumption=grid_points_to_add,
-        params=params,
-        **state_choice_vec,
+    utility = utility_function(
+        grid_points_to_add,
+        **utility_kwargs,
     )
-    values_to_add = utility + params["beta"] * expected_value_zero_savings
+    values_to_add = utility + discount_factor * expected_value_zero_savings
 
     grid_augmented = np.append(grid_points_to_add, endog_grid)
     value_augmented = np.append(values_to_add, value)

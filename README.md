@@ -9,5 +9,10 @@ Extension of the Fast Upper-Envelope Scan (FUES) for solving discrete-continuous
 
 ## References
 
+1. Iskhakov, Jorgensen, Rust, & Schjerning (2017).
+   [The Endogenous Grid Method for Discrete-Continuous Dynamic Choice Models with (or without) Taste Shocks](http://onlinelibrary.wiley.com/doi/10.3982/QE643/full).
+   *Quantitative Economics*
+
+
 1. Loretti I. Dobrescu & Akshay Shanker (2022).
    [Fast Upper-Envelope Scan for Discrete-Continuous Dynamic Programming](https://dx.doi.org/10.2139/ssrn.4181302).

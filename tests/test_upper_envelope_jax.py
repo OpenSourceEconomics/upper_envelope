@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.shared import process_function_args_to_kwargs
 from upper_envelope.upper_envelope_jax import fast_upper_envelope
 from upper_envelope.upper_envelope_jax import (
     fast_upper_envelope_wrapper,
@@ -81,9 +80,7 @@ def setup_model():
 
     options["state_space"]["exogenous_states"] = {"exog_state": [0]}
 
-    compute_utility = process_function_args_to_kwargs(utility_crra)
-
-    return params, exog_savings_grid, state_choice_vars, compute_utility
+    return params, exog_savings_grid, state_choice_vars
 
 
 @pytest.mark.parametrize("period", [2, 4, 9, 10, 18])
@@ -112,8 +109,12 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         ~np.isnan(value_refined_fedor).any(axis=0),
     ]
 
-    params, _exog_savings_grid, state_choice_vars, compute_utility = setup_model
+    params, _exog_savings_grid, state_choice_vars = setup_model
 
+    utility_kwargs = {
+        "choice": state_choice_vars["choice"],
+        "params": params,
+    }
     (
         endog_grid_refined,
         policy_left_refined,
@@ -124,9 +125,9 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        state_choice_vec=state_choice_vars,
-        params=params,
-        compute_utility=compute_utility,
+        utility_function=utility_crra,
+        utility_kwargs=utility_kwargs,
+        disc_factor=params["beta"],
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -164,7 +165,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
     value_egm = np.genfromtxt(
         TEST_RESOURCES_DIR / "upper_envelope_period_tests/val10.csv", delimiter=","
     )
-    _params, exog_savings_grid, state_choice_vars, compute_utility = setup_model
+    _params, exog_savings_grid, state_choice_vars = setup_model
 
     (
         endog_grid_refined,
@@ -185,7 +186,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
         value=value_egm[1],
         exog_grid=exog_savings_grid,
         choice=state_choice_vars["choice"],
-        compute_utility=compute_utility,
+        compute_utility=utility_crra,
     )
 
     endog_grid_expected = endog_grid_org[~np.isnan(endog_grid_org)]
@@ -208,21 +209,26 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         delimiter=",",
     )
 
-    params, exog_savings_grid, state_choice_vec, compute_utility = setup_model
+    params, exog_savings_grid, state_choice_vec = setup_model
 
     _policy_fedor, _value_fedor = upper_envelope(
         policy=policy_egm,
         value=value_egm,
         exog_grid=exog_savings_grid,
-        state_choice_vec=state_choice_vec,
+        state_choice_vec={"choice": state_choice_vec["choice"]},
         params=params,
-        compute_utility=compute_utility,
+        compute_utility=utility_crra,
     )
     policy_expected = _policy_fedor[:, ~np.isnan(_policy_fedor).any(axis=0)]
     value_expected = _value_fedor[
         :,
         ~np.isnan(_value_fedor).any(axis=0),
     ]
+
+    utility_kwargs = {
+        "choice": state_choice_vec["choice"],
+        "params": params,
+    }
 
     (
         endog_grid_fues,
@@ -234,9 +240,9 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        state_choice_vec=state_choice_vec,
-        params=params,
-        compute_utility=compute_utility,
+        utility_function=utility_crra,
+        utility_kwargs=utility_kwargs,
+        disc_factor=params["beta"],
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100
