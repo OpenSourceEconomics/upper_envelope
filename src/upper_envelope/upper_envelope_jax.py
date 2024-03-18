@@ -691,13 +691,13 @@ def back_and_forward_scan_wrapper(
 
         def cond_func(carry):
             (
-                found_value_already,
+                is_on_same_value,
                 idx_on_same_value,
                 grad_we_search_for,
                 current_index,
             ) = carry
             return (
-                ~found_value_already
+                ~is_on_same_value
                 & (current_index < max_index)
                 & (current_index < len(endog_grid))
             )
@@ -709,15 +709,13 @@ def back_and_forward_scan_wrapper(
 
         def cond_func(carry):
             (
-                found_value_already,
+                is_on_same_value,
                 idx_on_same_value,
                 grad_we_search_for,
                 current_index,
             ) = carry
             return (
-                ~found_value_already
-                & (current_index > min_index)
-                & (current_index >= 0)
+                ~is_on_same_value & (current_index > min_index) & (current_index >= 0)
             )
 
         start_index = idx_to_inspect - 1
@@ -725,13 +723,13 @@ def back_and_forward_scan_wrapper(
         raise ValueError("Direction must be either 'forward' or 'backward'.")
 
     # Initialize starting values
-    found_value_already = False
+    is_on_same_value = False
     idx_on_same_value = 0
     grad_we_search_for = 0.0
 
     # These values will be updated each iteration.
     carry_to_update = (
-        found_value_already,
+        is_on_same_value,
         idx_on_same_value,
         grad_we_search_for,
         start_index,
@@ -744,7 +742,7 @@ def back_and_forward_scan_wrapper(
 
     # Read out final carry.
     (
-        found_value_already,
+        is_on_same_value,
         idx_on_same_value,
         grad_we_search_for,
         start_index,
@@ -801,9 +799,9 @@ def back_and_forward_scan_body(
 
     """
     (
-        found_value_already,
-        idx_on_same_value,
-        grad_we_search_for,
+        _,
+        _,
+        _,
         current_index_to_scan,
     ) = carry
 
@@ -822,26 +820,19 @@ def back_and_forward_scan_body(
         x2=endog_grid[current_index_to_scan],
         y2=value[current_index_to_scan],
     )
-    # Now check if this is the first value on the same value function
-    # This is only 1 if so far there hasn't been found a point and the point is on
-    # the same value function
-    is_point_we_search = is_on_same_value & (1 - found_value_already)
-    # Update if you have found a point. Always 1 (=True) if you have found a point
-    # already
-    found_value_already = found_value_already | is_on_same_value
+
+    # Update if we found the point we search for
+    idx_on_same_value = current_index_to_scan * is_on_same_value
 
     # Update the first time a new point is found
-    idx_on_same_value += current_index_to_scan * is_point_we_search
-
-    # Update the first time a new point is found
-    grad_we_search_for += grad_to_idx_to_scan * is_point_we_search
+    grad_we_search_for = grad_to_idx_to_scan * is_on_same_value
     if direction == "forward":
         current_index_to_scan += 1
     elif direction == "backward":
         current_index_to_scan -= 1
 
     return (
-        found_value_already,
+        is_on_same_value,
         idx_on_same_value,
         grad_we_search_for,
         current_index_to_scan,
