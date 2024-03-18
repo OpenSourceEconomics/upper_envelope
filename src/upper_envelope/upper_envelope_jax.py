@@ -547,9 +547,6 @@ def _forward_scan(
         - idx_on_same_value (int): Index of next point on the value function.
 
     """
-    indexes_to_scan = idx_to_inspect + np.arange(
-        1, n_points_to_scan + 1, dtype=np.int64
-    )
     (
         grad_next_on_same_value,
         idx_on_same_value,
@@ -561,8 +558,10 @@ def _forward_scan(
         endog_grid=endog_grid,
         value=value,
         policy=policy,
-        indexes_to_scan=indexes_to_scan,
+        idx_to_inspect=idx_to_inspect,
+        n_points_to_scan=n_points_to_scan,
         jump_thresh=jump_thresh,
+        direction="forward",
     )
 
     return (
@@ -608,9 +607,6 @@ def _backward_scan(
             previous point on the same value function.
 
     """
-    indexes_to_scan = idx_to_inspect - np.arange(
-        1, n_points_to_scan + 1, dtype=np.int64
-    )
     (
         grad_before_on_same_value,
         idx_point_before_on_same_value,
@@ -621,9 +617,11 @@ def _backward_scan(
         policy_to_scan_from=policy[idx_to_inspect],
         endog_grid=endog_grid,
         value=value,
+        idx_to_inspect=idx_to_inspect,
         policy=policy,
-        indexes_to_scan=indexes_to_scan,
+        n_points_to_scan=n_points_to_scan,
         jump_thresh=jump_thresh,
+        direction="backward",
     )
 
     return grad_before_on_same_value, idx_point_before_on_same_value
@@ -637,8 +635,10 @@ def back_and_forward_scan_wrapper(
     endog_grid,
     value,
     policy,
-    indexes_to_scan,
+    idx_to_inspect,
+    n_points_to_scan,
     jump_thresh,
+    direction,
 ):
     """Wrapper function to execute the backwards and forward scan.
 
@@ -683,7 +683,46 @@ def back_and_forward_scan_wrapper(
         value=value,
         policy=policy,
         jump_thresh=jump_thresh,
+        direction=direction,
     )
+
+    if direction == "forward":
+        max_index = idx_to_inspect + n_points_to_scan
+
+        def cond_func(carry):
+            (
+                found_value_already,
+                idx_on_same_value,
+                grad_we_search_for,
+                current_index,
+            ) = carry
+            return (
+                ~found_value_already
+                & (current_index < max_index)
+                & (current_index < len(endog_grid))
+            )
+
+        start_index = idx_to_inspect + 1
+
+    elif direction == "backward":
+        min_index = idx_to_inspect - n_points_to_scan
+
+        def cond_func(carry):
+            (
+                found_value_already,
+                idx_on_same_value,
+                grad_we_search_for,
+                current_index,
+            ) = carry
+            return (
+                ~found_value_already
+                & (current_index > min_index)
+                & (current_index >= 0)
+            )
+
+        start_index = idx_to_inspect - 1
+    else:
+        raise ValueError("Direction must be either 'forward' or 'backward'.")
 
     # Initialize starting values
     found_value_already = False
@@ -695,11 +734,12 @@ def back_and_forward_scan_wrapper(
         found_value_already,
         idx_on_same_value,
         grad_we_search_for,
+        start_index,
     )
 
     # Execute scan function. The result is the final carry value.
-    final_carry, _ = jax.lax.scan(
-        f=partial_body, init=carry_to_update, xs=indexes_to_scan
+    final_carry = jax.lax.while_loop(
+        cond_fun=cond_func, body_fun=partial_body, init_val=carry_to_update
     )
 
     # Read out final carry.
@@ -707,6 +747,7 @@ def back_and_forward_scan_wrapper(
         found_value_already,
         idx_on_same_value,
         grad_we_search_for,
+        start_index,
     ) = final_carry
 
     return (
@@ -717,7 +758,6 @@ def back_and_forward_scan_wrapper(
 
 def back_and_forward_scan_body(
     carry,
-    current_scaned_index,
     endog_grid_to_calculate_gradient,
     value_to_calculate_gradient,
     endog_grid_to_scan_from,
@@ -726,6 +766,7 @@ def back_and_forward_scan_body(
     value,
     policy,
     jump_thresh,
+    direction,
 ):
     """The scan body to be executed at each iteration of the backwards and forward scan
     function.
@@ -763,18 +804,14 @@ def back_and_forward_scan_body(
         found_value_already,
         idx_on_same_value,
         grad_we_search_for,
+        current_index_to_scan,
     ) = carry
-
-    # Make sure that we do not index out of bounds. If we reach the beginning or end of
-    # the array, we'll just du dummy evaluations on the same point.
-    max_index_in_array = endog_grid.shape[0] - 1
-    idx_scan = jax.lax.clamp(0, current_scaned_index, max_index_in_array)
 
     is_not_on_same_value = create_indicator_if_value_function_is_switched(
         endog_grid_1=endog_grid_to_scan_from,
         policy_1=policy_to_scan_from,
-        endog_grid_2=endog_grid[idx_scan],
-        policy_2=policy[idx_scan],
+        endog_grid_2=endog_grid[current_index_to_scan],
+        policy_2=policy[current_index_to_scan],
         jump_thresh=jump_thresh,
     )
     is_on_same_value = ~is_not_on_same_value
@@ -782,8 +819,8 @@ def back_and_forward_scan_body(
     grad_to_idx_to_scan = calc_gradient(
         x1=endog_grid_to_calculate_gradient,
         y1=value_to_calculate_gradient,
-        x2=endog_grid[idx_scan],
-        y2=value[idx_scan],
+        x2=endog_grid[current_index_to_scan],
+        y2=value[current_index_to_scan],
     )
     # Now check if this is the first value on the same value function
     # This is only 1 if so far there hasn't been found a point and the point is on
@@ -794,15 +831,21 @@ def back_and_forward_scan_body(
     found_value_already = found_value_already | is_on_same_value
 
     # Update the first time a new point is found
-    idx_on_same_value += idx_scan * is_point_we_search
+    idx_on_same_value += current_index_to_scan * is_point_we_search
 
     # Update the first time a new point is found
     grad_we_search_for += grad_to_idx_to_scan * is_point_we_search
+    if direction == "forward":
+        current_index_to_scan += 1
+    elif direction == "backward":
+        current_index_to_scan -= 1
+
     return (
         found_value_already,
         idx_on_same_value,
         grad_we_search_for,
-    ), None
+        current_index_to_scan,
+    )
 
 
 def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, case_2, case_5):
