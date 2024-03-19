@@ -3,97 +3,10 @@ from typing import Tuple
 
 import jax
 from jax import numpy as jnp
-from upper_envelope.fues_jax.upper_envelope_jax import (
+from upper_envelope.fues_jax.check_conditions import (
     create_indicator_if_value_function_is_switched,
 )
 from upper_envelope.math_funcs import calc_gradient
-
-
-def run_forward_and_backward_scans(
-    value,
-    policy,
-    endog_grid,
-    points_j_and_k,
-    idx_to_inspect,
-    n_points_to_scan,
-    jump_thresh,
-):
-    """Run the forward and backward scans at the point with idx_to_scan_from.
-
-    We use the forward scan to find the next point that lies on the same value
-    function segment as the most recent point on the upper envelope (j).
-    Then we calculate the gradient between the point found on the same value function
-    segment and the point we currently inspect at idx_to_scan_from.
-
-    We use the backward scan to find the preceding point that lies on the same value
-    function segment as the point we inspect. Then we calculate the gradient between
-    the point found and the most recent point on the upper envelope (j).
-
-    Args:
-        value (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
-            unrefined value correspondence.
-        policy (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
-            unrefined policy correspondence.
-        endog_grid (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
-            unrefined endogenous wealth grid.
-        points_j_and_k (tuple): Tuple containing the value, policy and endogenous grid
-            of the most recent point that lies on on the the upper envelope (j) and the
-            point before (k).
-        idx_to_scan_from (int): Index of the point we scan from. This should be the
-            current point we inspect.
-        n_points_to_scan (int): Number of points to scan.
-        jump_thresh (float): Jump detection threshold.
-
-    Returns:
-        tuple:
-
-        - grad_next_forward (float): The gradient between the next point on the same
-            value function segment as j and the current point we inspect.
-        - idx_next_on_lower_curve (int): Index of the next point on the same value
-            function segment as j.
-        - grad_next_backward (float): The gradient between the point before on the same
-            value function segment as the current point we inspect and the most recent
-            point that lies on the upper envelope (j).
-        - idx_before_on_upper_curve (int): Index of the point before on the same value
-            function segment as the current point we inspect.
-
-    """
-
-    value_k_and_j, policy_k_and_j, endog_grid_k_and_j = points_j_and_k
-
-    (
-        grad_next_forward,
-        idx_next_on_lower_curve,
-    ) = forward_scan(
-        value=value,
-        policy=policy,
-        endog_grid=endog_grid,
-        endog_grid_j=endog_grid_k_and_j[1],
-        policy_j=policy_k_and_j[1],
-        idx_to_inspect=idx_to_inspect,
-        n_points_to_scan=n_points_to_scan,
-        jump_thresh=jump_thresh,
-    )
-
-    (
-        grad_next_backward,
-        idx_before_on_upper_curve,
-    ) = backward_scan(
-        value=value,
-        policy=policy,
-        endog_grid=endog_grid,
-        value_j=value_k_and_j[1],
-        endog_grid_j=endog_grid_k_and_j[1],
-        idx_to_inspect=idx_to_inspect,
-        n_points_to_scan=n_points_to_scan,
-        jump_thresh=jump_thresh,
-    )
-    return (
-        grad_next_forward,
-        idx_next_on_lower_curve,
-        grad_next_backward,
-        idx_before_on_upper_curve,
-    )
 
 
 def forward_scan(
@@ -102,11 +15,16 @@ def forward_scan(
     endog_grid: jnp.ndarray,
     endog_grid_j: float,
     policy_j: float,
-    idx_to_inspect: int,
+    idx_to_scan_from: int,
     n_points_to_scan: int,
     jump_thresh: float,
 ) -> Tuple[float, int]:
     """Find next point on same value function as most recent point on upper envelope.
+
+    We use the forward scan to find the next point that lies on the same value
+    function segment as the most recent point on the upper envelope (j).
+    Then we calculate the gradient between the point found on the same value function
+    segment and the point we currently inspect at idx_to_scan_from.
 
     Args:
         value (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
@@ -136,14 +54,14 @@ def forward_scan(
         grad_next_on_same_value,
         idx_on_same_value,
     ) = back_and_forward_scan_wrapper(
-        endog_grid_to_calculate_gradient=endog_grid[idx_to_inspect],
-        value_to_calculate_gradient=value[idx_to_inspect],
+        endog_grid_to_calculate_gradient=endog_grid[idx_to_scan_from],
+        value_to_calculate_gradient=value[idx_to_scan_from],
         endog_grid_to_scan_from=endog_grid_j,
         policy_to_scan_from=policy_j,
         endog_grid=endog_grid,
         value=value,
         policy=policy,
-        idx_to_inspect=idx_to_inspect,
+        idx_to_scan_from=idx_to_scan_from,
         n_points_to_scan=n_points_to_scan,
         jump_thresh=jump_thresh,
         direction="forward",
@@ -157,15 +75,19 @@ def forward_scan(
 
 def backward_scan(
     value: jnp.ndarray,
-    policy: jnp.array,
+    policy: jnp.ndarray,
     endog_grid: jnp.ndarray,
     endog_grid_j,
     value_j,
-    idx_to_inspect: int,
+    idx_to_scan_from: int,
     n_points_to_scan: int,
     jump_thresh: float,
 ) -> Tuple[float, int]:
     """Find previous point on same value function as idx_to_scan_from.
+
+    We use the backward scan to find the preceding point that lies on the same value
+    function segment as the point we inspect. Then we calculate the gradient between
+    the point found and the most recent point on the upper envelope (j).
 
     Args:
         value (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
@@ -198,11 +120,11 @@ def backward_scan(
     ) = back_and_forward_scan_wrapper(
         endog_grid_to_calculate_gradient=endog_grid_j,
         value_to_calculate_gradient=value_j,
-        endog_grid_to_scan_from=endog_grid[idx_to_inspect],
-        policy_to_scan_from=policy[idx_to_inspect],
+        endog_grid_to_scan_from=endog_grid[idx_to_scan_from],
+        policy_to_scan_from=policy[idx_to_scan_from],
         endog_grid=endog_grid,
         value=value,
-        idx_to_inspect=idx_to_inspect,
+        idx_to_scan_from=idx_to_scan_from,
         policy=policy,
         n_points_to_scan=n_points_to_scan,
         jump_thresh=jump_thresh,
@@ -213,14 +135,14 @@ def backward_scan(
 
 
 def back_and_forward_scan_wrapper(
-    endog_grid_to_calculate_gradient,
-    value_to_calculate_gradient,
-    endog_grid_to_scan_from,
-    policy_to_scan_from,
-    endog_grid,
+    endog_grid_to_calculate_gradient: float | jnp.ndarray,
+    value_to_calculate_gradient: float | jnp.ndarray,
+    endog_grid_to_scan_from: float | jnp.ndarray,
+    policy_to_scan_from: float | jnp.ndarray,
+    endog_grid: float | jnp.ndarray,
     value,
     policy,
-    idx_to_inspect,
+    idx_to_scan_from,
     n_points_to_scan,
     jump_thresh,
     direction,
@@ -238,16 +160,17 @@ def back_and_forward_scan_wrapper(
         policy_to_scan_from (float): The policy function point to scan from. We want to
             find the grid point which is on the same value function segment as the point
             we scan from.
+        idx_to_scan_from (int): Index of the point we want to scan from. This should
+            be the current point we inspect.
         endog_grid (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined endogenous wealth grid.
         value (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined value correspondence.
         policy (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined policy correspondence.
-        indexes_to_scan (np.ndarray): 1d array of shape (n_points_to_scan,) containing
-            the indexes to scan.
+        n_points_to_scan (int): Number of points to scan.
         jump_thresh (float): Threshold for the jump in the value function.
-
+        direction (str): The direction of the scan. Either 'forward' or 'backward'.
 
     Returns:
         tuple:
@@ -272,7 +195,7 @@ def back_and_forward_scan_wrapper(
     )
 
     if direction == "forward":
-        max_index = idx_to_inspect + n_points_to_scan
+        max_index = idx_to_scan_from + n_points_to_scan
 
         def cond_func(carry):
             (
@@ -287,10 +210,10 @@ def back_and_forward_scan_wrapper(
                 & (current_index < len(endog_grid))
             )
 
-        start_index = idx_to_inspect + 1
+        start_index = idx_to_scan_from + 1
 
     elif direction == "backward":
-        min_index = idx_to_inspect - n_points_to_scan
+        min_index = idx_to_scan_from - n_points_to_scan
 
         def cond_func(carry):
             (
@@ -303,7 +226,7 @@ def back_and_forward_scan_wrapper(
                 ~is_on_same_value & (current_index > min_index) & (current_index >= 0)
             )
 
-        start_index = idx_to_inspect - 1
+        start_index = idx_to_scan_from - 1
     else:
         raise ValueError("Direction must be either 'forward' or 'backward'.")
 
@@ -357,7 +280,6 @@ def back_and_forward_scan_body(
     Args:
         carry (tuple): The carry value passed from the previous iteration. This is a
             tuple containing the variables that are updated in each iteration.
-        current_scaned_index (int): The current index to be scanned.
         endog_grid_to_calculate_gradient (float): The endogenous grid point to calculate
             the gradient from.
         value_to_calculate_gradient (float): The value function point to calculate the
@@ -375,6 +297,7 @@ def back_and_forward_scan_body(
         policy (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined policy correspondence.
         jump_thresh (float): Threshold for the jump in the value function.
+        direction (str): The direction of the scan. Either 'forward' or 'backward'.
 
     Returns:
         tuple:
