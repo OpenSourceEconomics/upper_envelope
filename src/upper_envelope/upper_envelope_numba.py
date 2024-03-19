@@ -170,7 +170,7 @@ def fast_upper_envelope(
 
     endog_grid = endog_grid[np.where(~np.isnan(value))[0]]
     policy = policy[np.where(~np.isnan(value))]
-    exog_grid = exog_grid[np.where(~np.isnan(value))]
+    exog_grid = exog_grid[np.where(~np.isnan(value))[0]]
     value = value[np.where(~np.isnan(value))]
 
     idx_sort = np.argsort(endog_grid, kind="mergesort")

@@ -31,7 +31,7 @@ def fast_upper_envelope_wrapper(
     utility_function: Callable,
     utility_kwargs: Dict,
     disc_factor: float,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Drop suboptimal points and refines the endogenous grid, policy, and value.
 
     Computes the upper envelope over the overlapping segments of the
@@ -113,8 +113,7 @@ def fast_upper_envelope_wrapper(
     (
         endog_grid_refined,
         value_refined,
-        policy_left_refined,
-        policy_right_refined,
+        policy_refined,
     ) = fast_upper_envelope(
         grid_augmented,
         value_augmented,
@@ -125,8 +124,7 @@ def fast_upper_envelope_wrapper(
     )
     return (
         endog_grid_refined,
-        policy_left_refined,
-        policy_right_refined,
+        policy_refined,
         value_refined,
     )
 
@@ -138,7 +136,7 @@ def fast_upper_envelope(
     expected_value_zero_savings: float,
     num_iter: int,
     jump_thresh: Optional[float] = 2,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
     Args:
@@ -183,8 +181,7 @@ def fast_upper_envelope(
 
     (
         value_refined,
-        policy_left_refined,
-        policy_right_refined,
+        policy_refined,
         endog_grid_refined,
     ) = scan_value_function(
         endog_grid=endog_grid,
@@ -196,7 +193,7 @@ def fast_upper_envelope(
         n_points_to_scan=10,
     )
 
-    return endog_grid_refined, value_refined, policy_left_refined, policy_right_refined
+    return endog_grid_refined, value_refined, policy_refined
 
 
 def scan_value_function(
@@ -207,7 +204,7 @@ def scan_value_function(
     num_iter: int,
     jump_thresh: float,
     n_points_to_scan: Optional[int] = 0,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Scan the value function to remove suboptimal points and add intersection points.
 
     Args:
@@ -237,13 +234,14 @@ def scan_value_function(
     policy_k_and_j = 0, policy[0]
     vars_j_and_k_inital = (value_k_and_j, policy_k_and_j, endog_grid_k_and_j)
 
-    to_be_saved_inital = (expected_value_zero_savings, 0.0, 0.0, 0.0)
+    to_be_saved_inital = (expected_value_zero_savings, 0.0, 0.0)
     last_point_in_grid = jnp.array([value[-1], policy[-1], endog_grid[-1]])
     dummy_points_grid = jnp.array([jnp.nan, jnp.nan, jnp.nan])
 
     idx_to_inspect = 0
-    last_point_was_intersect = False
-    saved_last_point_already = False
+    last_point_was_intersect = jnp.array(False)
+    second_last_point_was_intersect = jnp.array(False)
+    saved_last_point_already = jnp.array(False)
 
     carry_init = (
         vars_j_and_k_inital,
@@ -251,6 +249,7 @@ def scan_value_function(
         idx_to_inspect,
         saved_last_point_already,
         last_point_was_intersect,
+        second_last_point_was_intersect,
     )
     partial_body = partial(
         scan_body,
@@ -328,6 +327,7 @@ def scan_body(
         idx_to_inspect,
         saved_last_point_already,
         last_point_was_intersect,
+        second_last_point_was_intersect,
     ) = carry
 
     point_to_inspect = (
@@ -352,6 +352,7 @@ def scan_body(
         idx_to_scan_from=idx_to_inspect,
         n_points_to_scan=n_points_to_scan,
         last_point_was_intersect=last_point_was_intersect,
+        second_last_point_was_intersect=second_last_point_was_intersect,
         is_final_point_on_grid=is_final_point_on_grid,
         jump_thresh=jump_thresh,
     )
@@ -364,15 +365,15 @@ def scan_body(
         idx_next_on_lower_curve=idx_next_on_lower_curve,
         idx_before_on_upper_curve=idx_before_on_upper_curve,
         idx_to_inspect=idx_to_inspect,
-        case_5=cases[4],
-        case_6=cases[5],
+        case_5=cases[5],
+        case_6=cases[6],
     )
 
     # Select the values we want to save this iteration
     point_to_save_this_iteration = select_point_to_save_this_iteration(
         intersection_point=intersection_point,
         planned_to_be_saved_this_iter=planned_to_be_saved_this_iter,
-        case_6=cases[5],
+        case_6=cases[6],
     )
 
     point_case_2 = jax.lax.select(
@@ -383,6 +384,7 @@ def scan_body(
         point_to_inspect=point_to_inspect,
         point_case_2=point_case_2,
         intersection_point=intersection_point,
+        points_j_and_k=points_j_and_k,
         planned_to_be_saved_this_iter=planned_to_be_saved_this_iter,
         cases=cases,
     )
@@ -398,11 +400,11 @@ def scan_body(
         idx_to_inspect,
         saved_last_point_already,
         last_point_was_intersect,
+        second_last_point_was_intersect,
     ) = update_bools_and_idx_to_inspect(
         idx_to_inspect=idx_to_inspect,
         update_idx=update_idx,
-        case_2=cases[1],
-        case_5=cases[4],
+        cases=cases,
     )
 
     carry = (
@@ -411,12 +413,13 @@ def scan_body(
         idx_to_inspect,
         saved_last_point_already,
         last_point_was_intersect,
+        second_last_point_was_intersect,
     )
 
     return carry, point_to_save_this_iteration
 
 
-def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, case_2, case_5):
+def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, cases):
     """Update indicators and index of the point to be inspected in the next period.
 
     The indicators are booleans that capture cases where
@@ -443,14 +446,21 @@ def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, case_2, case_5):
             intersection point.
 
     """
+    case_0, case_1, case_2, case_3, case_4, case_5, case_6 = cases
     idx_to_inspect += update_idx
 
     # In the iteration where case_2 is True for the first time, the last point we
     # checked is selected and afterwards only nans are added.
     saved_last_point_already = case_2
-    last_point_was_intersect = case_5
+    last_point_was_intersect = case_5 | case_6 | case_0
+    second_last_point_was_intersect = case_5
 
-    return idx_to_inspect, saved_last_point_already, last_point_was_intersect
+    return (
+        idx_to_inspect,
+        saved_last_point_already,
+        last_point_was_intersect,
+        second_last_point_was_intersect,
+    )
 
 
 def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, cases):
@@ -484,9 +494,9 @@ def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, 
     value_k_and_j, policy_k_and_j, endog_grid_k_and_j = points_j_and_k
     value_to_inspect, policy_to_inspect, endog_grid_to_inspect = point_to_inspect
 
-    case_1, case_2, case_3, case_4, case_5, case_6 = cases
+    case_0, case_1, case_2, case_3, case_4, case_5, case_6 = cases
     in_case_123 = case_1 | case_2 | case_3
-    in_case_1236 = case_1 | case_2 | case_3 | case_6
+    in_case_01236 = case_0 | case_1 | case_2 | case_3 | case_6
     in_case_45 = case_4 | case_5
 
     # In case 1, 2, 3 the old value remains as value_j, in 4, 5, value_j is former
@@ -494,30 +504,36 @@ def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, 
 
     # Value function update
     value_j_new = (
-        in_case_123 * value_k_and_j[1]
-        + in_case_45 * value_to_inspect
+        case_0 * value_to_inspect
+        + in_case_123 * value_k_and_j[1]
+        + case_4 * value_to_inspect
+        + case_5 * intersect_value
         + case_6 * intersect_value
     )
-    value_k_new = in_case_1236 * value_k_and_j[0] + in_case_45 * value_k_and_j[1]
+    value_k_new = in_case_01236 * value_k_and_j[0] + in_case_45 * value_k_and_j[1]
     value_k_and_j = value_k_new, value_j_new
 
     # Policy function update
     policy_j_new = (
-        in_case_123 * policy_k_and_j[1]
-        + in_case_45 * policy_to_inspect
+        case_0 * policy_to_inspect
+        + in_case_123 * policy_k_and_j[1]
+        + case_4 * policy_to_inspect
+        + case_5 * intersect_policy_right
         + case_6 * intersect_policy_right
     )
-    policy_k_new = in_case_1236 * policy_k_and_j[0] + in_case_45 * policy_k_and_j[1]
+    policy_k_new = in_case_01236 * policy_k_and_j[0] + in_case_45 * policy_k_and_j[1]
     policy_k_and_j = policy_k_new, policy_j_new
 
     # Endog grid update
     endog_grid_j_new = (
-        in_case_123 * endog_grid_k_and_j[1]
-        + in_case_45 * endog_grid_to_inspect
+        case_0 * endog_grid_to_inspect
+        + in_case_123 * endog_grid_k_and_j[1]
+        + case_4 * endog_grid_to_inspect
+        + case_5 * intersect_grid
         + case_6 * intersect_grid
     )
     endog_grid_k_new = (
-        in_case_1236 * endog_grid_k_and_j[0] + in_case_45 * endog_grid_k_and_j[1]
+        in_case_01236 * endog_grid_k_and_j[0] + in_case_45 * endog_grid_k_and_j[1]
     )
     endog_grid_k_and_j = endog_grid_k_new, endog_grid_j_new
 
@@ -527,6 +543,7 @@ def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, 
 def select_points_to_be_saved_next_iteration(
     point_to_inspect,
     point_case_2,
+    points_j_and_k,
     intersection_point,
     planned_to_be_saved_this_iter,
     cases,
@@ -552,14 +569,14 @@ def select_points_to_be_saved_next_iteration(
             saved in the next iteration.
 
     """
-    case_1, case_2, case_3, case_4, case_5, case_6 = cases
+    case_0, case_1, case_2, case_3, case_4, case_5, case_6 = cases
     value_case_2, policy_case_2, endog_grid_case_2 = point_case_2
     value_to_inspect, policy_to_inspect, endog_grid_to_inspect = point_to_inspect
+    value_k_and_j, policy_k_and_j, endog_grid_k_and_j = points_j_and_k
 
     (
         planned_value,
-        planned_policy_left,
-        planned_policy_right,
+        planned_policy,
         planned_endog_grid,
     ) = planned_to_be_saved_this_iter
 
@@ -570,37 +587,38 @@ def select_points_to_be_saved_next_iteration(
         intersect_policy_right,
     ) = intersection_point
 
-    in_case_146 = case_1 | case_4 | case_6
-
     value_to_be_saved_next = (
-        in_case_146 * value_to_inspect
+        case_0 * value_k_and_j[1]
+        + case_1 * value_to_inspect
         + case_2 * value_case_2
-        + case_5 * intersect_value
         + case_3 * planned_value
+        + case_4 * value_to_inspect
+        + case_5 * intersect_value
+        + case_6 * intersect_value
     )
-    policy_left_to_be_saved_next = (
-        in_case_146 * policy_to_inspect
+
+    policy_to_be_saved_next = (
+        case_0 * policy_k_and_j[1]
+        + case_1 * policy_to_inspect
         + case_2 * policy_case_2
+        + case_3 * planned_policy
+        + case_4 * policy_to_inspect
         + case_5 * intersect_policy_left
-        + case_3 * planned_policy_left
-    )
-    policy_right_to_be_saved_next = (
-        in_case_146 * policy_to_inspect
-        + case_2 * policy_case_2
-        + case_5 * intersect_policy_right
-        + case_3 * planned_policy_right
+        + case_6 * intersect_policy_right
     )
     endog_grid_to_be_saved_next = (
-        in_case_146 * endog_grid_to_inspect
+        case_0 * endog_grid_k_and_j[1]
+        + case_1 * endog_grid_to_inspect
         + case_2 * endog_grid_case_2
-        + case_5 * intersect_grid
         + case_3 * planned_endog_grid
+        + case_4 * endog_grid_to_inspect
+        + case_5 * intersect_grid
+        + case_6 * intersect_grid
     )
 
     return (
         value_to_be_saved_next,
-        policy_left_to_be_saved_next,
-        policy_right_to_be_saved_next,
+        policy_to_be_saved_next,
         endog_grid_to_be_saved_next,
     )
 
@@ -640,23 +658,17 @@ def select_point_to_save_this_iteration(
     ) = intersection_point
     (
         planned_value,
-        planned_policy_left,
-        planned_policy_right,
+        planned_policy,
         planned_endog_grid,
     ) = planned_to_be_saved_this_iter
 
     # Determine variables to save this iteration. This is always the variables
     # carried from last iteration. Except in case 6.
     value_to_save = planned_value * (1 - case_6) + intersect_value * case_6
-    policy_left_to_save = (
-        planned_policy_left * (1 - case_6) + intersect_policy_left * case_6
-    )
-    policy_right_to_save = (
-        planned_policy_right * (1 - case_6) + intersect_policy_right * case_6
-    )
+    policy_to_save = planned_policy * (1 - case_6) + intersect_policy_left * case_6
     endog_grid_to_save = planned_endog_grid * (1 - case_6) + intersect_grid * case_6
 
-    return value_to_save, policy_left_to_save, policy_right_to_save, endog_grid_to_save
+    return value_to_save, policy_to_save, endog_grid_to_save
 
 
 def select_and_calculate_intersection(

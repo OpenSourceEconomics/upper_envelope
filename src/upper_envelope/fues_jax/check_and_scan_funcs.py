@@ -15,6 +15,7 @@ def determine_cases_and_conduct_necessary_scans(
     idx_to_scan_from,
     n_points_to_scan,
     last_point_was_intersect,
+    second_last_point_was_intersect,
     is_final_point_on_grid,
     jump_thresh,
 ):
@@ -153,18 +154,27 @@ def determine_cases_and_conduct_necessary_scans(
     # rest can't be and 2 can only be true if 1 isn't.
     # Start with checking if last iteration was case_5, and we need
     # to add another point to the refined grid.
-    case_1 = last_point_was_intersect
-    case_2 = is_final_point_on_grid & ~case_1
-    case_3 = suboptimal_cond & ~case_1 & ~case_2
-    case_4 = ~does_the_value_func_switch * ~case_1 * ~case_2 * ~case_3
-    case_5 = next_point_past_intersect & ~case_1 & ~case_2 & ~case_3 & ~case_4
-    case_6 = point_j_past_intersect & ~case_1 & ~case_2 & ~case_3 & ~case_4 & ~case_5
+    case_0 = second_last_point_was_intersect & last_point_was_intersect
+    case_1 = last_point_was_intersect & ~case_0
+    case_2 = is_final_point_on_grid & ~case_0 & ~case_1
+    case_3 = suboptimal_cond & ~case_0 & ~case_1 & ~case_2
+    case_4 = ~does_the_value_func_switch * ~case_0 & ~case_1 * ~case_2 * ~case_3
+    case_5 = next_point_past_intersect & ~case_0 & ~case_1 & ~case_2 & ~case_3 & ~case_4
+    case_6 = (
+        point_j_past_intersect
+        & ~case_0
+        & ~case_1
+        & ~case_2
+        & ~case_3
+        & ~case_4
+        & ~case_5
+    )
 
     in_case_134 = case_1 | case_3 | case_4
-    update_idx = in_case_134 | (~in_case_134 & suboptimal_cond)
+    update_idx = (in_case_134 | (~in_case_134 & suboptimal_cond)) & (~(case_0 | case_1))
 
     return (
-        (case_1, case_2, case_3, case_4, case_5, case_6),
+        (case_0, case_1, case_2, case_3, case_4, case_5, case_6),
         update_idx,
         idx_next_on_lower_curve,
         idx_before_on_upper_curve,
