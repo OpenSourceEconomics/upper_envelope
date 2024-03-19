@@ -44,36 +44,9 @@ def determine_cases_and_conduct_necessary_scans(
 
     """
     value_k_and_j, policy_k_and_j, endog_grid_k_and_j = points_j_and_k
-    value_to_inspect, _policy_to_inspect, endog_grid_to_inspect = point_to_inspect
+    value_to_inspect, policy_to_inspect, endog_grid_to_inspect = point_to_inspect
 
-    (
-        grad_next_forward,
-        idx_next_on_lower_curve,
-    ) = forward_scan(
-        value=value,
-        policy=policy,
-        endog_grid=endog_grid,
-        endog_grid_j=endog_grid_k_and_j[1],
-        policy_j=policy_k_and_j[1],
-        idx_to_scan_from=idx_to_scan_from,
-        n_points_to_scan=n_points_to_scan,
-        jump_thresh=jump_thresh,
-    )
-
-    (
-        grad_next_backward,
-        idx_before_on_upper_curve,
-    ) = backward_scan(
-        value=value,
-        policy=policy,
-        endog_grid=endog_grid,
-        value_j=value_k_and_j[1],
-        endog_grid_j=endog_grid_k_and_j[1],
-        idx_to_scan_from=idx_to_scan_from,
-        n_points_to_scan=n_points_to_scan,
-        jump_thresh=jump_thresh,
-    )
-
+    # Gradient of the last two points.
     grad_before = calc_gradient(
         x1=endog_grid_k_and_j[1],
         y1=value_k_and_j[1],
@@ -89,12 +62,86 @@ def determine_cases_and_conduct_necessary_scans(
         y2=value_k_and_j[1],
     )
 
-    suboptimal_cond, does_the_value_func_switch = check_for_suboptimality(
-        points_j_and_k=points_j_and_k,
-        point_to_inspect=point_to_inspect,
-        grad_next=grad_next,
-        grad_next_forward=grad_next_forward,
-        grad_before=grad_before,
+    does_the_value_func_switch = create_indicator_if_value_function_is_switched(
+        endog_grid_1=endog_grid_k_and_j[1],
+        policy_1=policy_k_and_j[1],
+        endog_grid_2=endog_grid_to_inspect,
+        policy_2=policy_to_inspect,
+        jump_thresh=jump_thresh,
+    )
+
+    decreasing_value = value_to_inspect < value_k_and_j[1]
+
+    are_savings_non_monotone = check_for_non_monotone_savings(
+        endog_grid_j=endog_grid_k_and_j[1],
+        policy_j=policy_k_and_j[1],
+        endog_grid_idx_to_inspect=endog_grid_to_inspect,
+        policy_idx_to_inspect=policy_to_inspect,
+    )
+    """Even if the function returns False, the point may still be suboptimal. That is
+    iff, in the next iteration, we find that this point actually lies after a switching
+    point.
+
+    Here, we check if the point fulfills one of three conditions: 1) Either the value
+    function is decreasing with decreasing value function, 2) the value function is not
+    montone in consumption, or 3)
+
+    If the point to inspect is the same as point j, this is always false and we switch
+    the value function as well. Therefore, the third if is chosen.
+
+    """
+    # First check if the point is suboptimal by either a decreasing value or the
+    # value function is not monotone.
+    is_point_suboptimal = decreasing_value | (
+        are_savings_non_monotone & (grad_next < grad_before)
+    )
+
+    # If we already now that the point is suboptimal or the last point was an
+    # intersection point or we reached the end of the grid, we do not need to scan
+    # forward.
+    is_forward_scan_needed = ~(
+        is_point_suboptimal | last_point_was_intersect | is_final_point_on_grid
+    )
+    (
+        grad_next_forward,
+        idx_next_on_lower_curve,
+    ) = forward_scan(
+        value=value,
+        policy=policy,
+        endog_grid=endog_grid,
+        endog_grid_j=endog_grid_k_and_j[1],
+        policy_j=policy_k_and_j[1],
+        idx_to_scan_from=idx_to_scan_from,
+        n_points_to_scan=n_points_to_scan,
+        is_scan_needed=is_forward_scan_needed,
+        jump_thresh=jump_thresh,
+    )
+
+    switch_value_func_and_steep_increase_after = (
+        grad_next < grad_next_forward
+    ) & does_the_value_func_switch
+
+    # Additionally check if the gradient of the index we inspect and the point j
+    # (the most recent point on the same choice-specific policy) is shallower than
+    # the gradient joining the i+1 and j. If True, delete the j'th point.
+    suboptimal_cond = switch_value_func_and_steep_increase_after | is_point_suboptimal
+
+    is_back_ward_scan_needed = ~(
+        suboptimal_cond | last_point_was_intersect | is_final_point_on_grid
+    )
+
+    (
+        grad_next_backward,
+        idx_before_on_upper_curve,
+    ) = backward_scan(
+        value=value,
+        policy=policy,
+        endog_grid=endog_grid,
+        value_j=value_k_and_j[1],
+        endog_grid_j=endog_grid_k_and_j[1],
+        idx_to_scan_from=idx_to_scan_from,
+        n_points_to_scan=n_points_to_scan,
+        is_scan_needed=is_back_ward_scan_needed,
         jump_thresh=jump_thresh,
     )
 
@@ -123,85 +170,6 @@ def determine_cases_and_conduct_necessary_scans(
         idx_next_on_lower_curve,
         idx_before_on_upper_curve,
     )
-
-
-def check_for_suboptimality(
-    points_j_and_k,
-    point_to_inspect,
-    grad_next,
-    grad_next_forward,
-    grad_before,
-    jump_thresh,
-):
-    """Check if current point is sub-optimal.
-
-    Even if the function returns False, the point may still be suboptimal.
-    That is iff, in the next iteration, we find that this point actually lies after a
-    switching point.
-
-    Here, we check if the point fulfills one of three conditions:
-    1) Either the value function is decreasing with decreasing value function,
-    2) the value function is not montone in consumption, or
-    3) if the gradient of the index we inspect and the point j (the most recent point
-        on the same choice-specific policy) is shallower than the gradient joining
-        the i+1 and j. If True, delete the j'th point.
-
-    If the point to inspect is the same as point j, this is always false and we
-    switch the value function as well. Therefore, the third if is chosen.
-
-    Args:
-        points_j_and_k (tuple): Tuple containing the value, policym and endogenous grid
-            point of the most recent point on the upper envelope (j) and the point
-            before (k).
-        point_to_inspect (tuple): Tuple containing the value, policy, and endogenous
-            grid point of the point we inspect.
-        grad_next (float): The gradient between the most recent point that lies on the
-            upper envelope (j) and the point we inspect.
-        grad_next_forward (float): The gradient between the next point on the same value
-            function segment as j and the current point we inspect.
-        grad_before (float): The gradient between the most recent point on the upper
-            envelope (j) and the point before (k).
-        jump_thresh (float): Jump detection threshold.
-
-    Returns:
-        tuple:
-
-        - suboptimal_cond (bool): Indicator if the point is suboptimal.
-        - does_the_value_func_switch (bool): Indicator if the value function switches.
-
-    """
-    value_k_and_j, policy_k_and_j, endog_grid_k_and_j = points_j_and_k
-    value_to_inspect, policy_to_inspect, endog_grid_to_inspect = point_to_inspect
-
-    does_the_value_func_switch = create_indicator_if_value_function_is_switched(
-        endog_grid_1=endog_grid_k_and_j[1],
-        policy_1=policy_k_and_j[1],
-        endog_grid_2=endog_grid_to_inspect,
-        policy_2=policy_to_inspect,
-        jump_thresh=jump_thresh,
-    )
-    switch_value_func_and_steep_increase_after = (
-        grad_next < grad_next_forward
-    ) & does_the_value_func_switch
-
-    decreasing_value = value_to_inspect < value_k_and_j[1]
-
-    are_savings_non_monotone = check_for_non_monotone_savings(
-        endog_grid_j=endog_grid_k_and_j[1],
-        policy_j=policy_k_and_j[1],
-        endog_grid_idx_to_inspect=endog_grid_to_inspect,
-        policy_idx_to_inspect=policy_to_inspect,
-    )
-
-    # Aggregate the three cases
-    suboptimal_cond = (
-        switch_value_func_and_steep_increase_after
-        | decreasing_value
-        # Do we need the grad condition next?
-        | (are_savings_non_monotone & (grad_next < grad_before))
-    )
-
-    return suboptimal_cond, does_the_value_func_switch
 
 
 def check_for_non_monotone_savings(
@@ -276,6 +244,7 @@ def forward_scan(
     policy_j: float,
     idx_to_scan_from: int,
     n_points_to_scan: int,
+    is_scan_needed: bool,
     jump_thresh: float,
 ) -> Tuple[float, int]:
     """Find next point on same value function as most recent point on upper envelope.
@@ -322,6 +291,7 @@ def forward_scan(
         policy=policy,
         idx_to_scan_from=idx_to_scan_from,
         n_points_to_scan=n_points_to_scan,
+        is_scan_needed=is_scan_needed,
         jump_thresh=jump_thresh,
         direction="forward",
     )
@@ -340,6 +310,7 @@ def backward_scan(
     value_j,
     idx_to_scan_from: int,
     n_points_to_scan: int,
+    is_scan_needed,
     jump_thresh: float,
 ) -> Tuple[float, int]:
     """Find previous point on same value function as idx_to_scan_from.
@@ -386,6 +357,7 @@ def backward_scan(
         idx_to_scan_from=idx_to_scan_from,
         policy=policy,
         n_points_to_scan=n_points_to_scan,
+        is_scan_needed=is_scan_needed,
         jump_thresh=jump_thresh,
         direction="backward",
     )
@@ -403,6 +375,7 @@ def back_and_forward_scan_wrapper(
     policy,
     idx_to_scan_from,
     n_points_to_scan,
+    is_scan_needed,
     jump_thresh,
     direction,
 ):
@@ -464,7 +437,8 @@ def back_and_forward_scan_wrapper(
                 current_index,
             ) = carry
             return (
-                ~is_on_same_value
+                is_scan_needed
+                & ~is_on_same_value
                 & (current_index < max_index)
                 & (current_index < len(endog_grid))
             )
@@ -482,7 +456,10 @@ def back_and_forward_scan_wrapper(
                 current_index,
             ) = carry
             return (
-                ~is_on_same_value & (current_index > min_index) & (current_index >= 0)
+                is_scan_needed
+                & ~is_on_same_value
+                & (current_index > min_index)
+                & (current_index >= 0)
             )
 
         start_index = idx_to_scan_from - 1
