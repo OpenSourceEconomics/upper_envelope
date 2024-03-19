@@ -243,7 +243,7 @@ def forward_scan(
     policy_j: float,
     idx_to_scan_from: int,
     n_points_to_scan: int,
-    is_scan_needed: bool,
+    is_scan_needed,
     jump_thresh: float,
 ) -> Tuple[float, int]:
     """Find next point on same value function as most recent point on upper envelope.
