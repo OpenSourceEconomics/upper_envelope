@@ -78,29 +78,24 @@ def determine_cases_and_conduct_necessary_scans(
         endog_grid_idx_to_inspect=endog_grid_to_inspect,
         policy_idx_to_inspect=policy_to_inspect,
     )
-    """Even if the function returns False, the point may still be suboptimal. That is
-    iff, in the next iteration, we find that this point actually lies after a switching
-    point.
 
-    Here, we check if the point fulfills one of three conditions: 1) Either the value
-    function is decreasing with decreasing value function, 2) the value function is not
-    montone in consumption, or 3)
-
-    If the point to inspect is the same as point j, this is always false and we switch
-    the value function as well. Therefore, the third if is chosen.
-
-    """
     # First check if the point is suboptimal by either a decreasing value or the
     # value function is not monotone.
     is_point_suboptimal = decreasing_value | (
         are_savings_non_monotone & (grad_next < grad_before)
     )
 
-    # If we already now that the point is suboptimal or the last point was an
-    # intersection point or we reached the end of the grid, we do not need to scan
-    # forward.
+    # If the last point was an intersection point or we reached the end of the grid or
+    # we already now that the point is suboptimal or we the value function is not
+    # switching, we do not need to scan forward.
+    # That is case 1, 2 or we know we are in 3 (Subopimality is checked
+    # again below). Additionally check if we are in case 4, i.e. the value function
+    # does not switch and we the point is not suboptimal.
     is_forward_scan_needed = ~(
-        is_point_suboptimal | last_point_was_intersect | is_final_point_on_grid
+        last_point_was_intersect
+        | is_final_point_on_grid
+        | is_point_suboptimal
+        | ~does_the_value_func_switch
     )
     (
         grad_next_forward,
@@ -126,8 +121,12 @@ def determine_cases_and_conduct_necessary_scans(
     # the gradient joining the i+1 and j. If True, delete the j'th point.
     suboptimal_cond = switch_value_func_and_steep_increase_after | is_point_suboptimal
 
+    # Same conditions as with forward scan.
     is_back_ward_scan_needed = ~(
-        suboptimal_cond | last_point_was_intersect | is_final_point_on_grid
+        suboptimal_cond
+        | last_point_was_intersect
+        | is_final_point_on_grid
+        | ~does_the_value_func_switch
     )
 
     (
