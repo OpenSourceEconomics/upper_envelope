@@ -491,14 +491,17 @@ def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, 
 
     # In case 1, 2, 3 the old value remains as value_j, in 4, 5, value_j is former
     # value k and in 6 the old value_j is overwritten
+
+    # Value function update
     value_j_new = (
         in_case_123 * value_k_and_j[1]
         + in_case_45 * value_to_inspect
         + case_6 * intersect_value
     )
     value_k_new = in_case_1236 * value_k_and_j[0] + in_case_45 * value_k_and_j[1]
-
     value_k_and_j = value_k_new, value_j_new
+
+    # Policy function update
     policy_j_new = (
         in_case_123 * policy_k_and_j[1]
         + in_case_45 * policy_to_inspect
@@ -506,6 +509,8 @@ def update_values_j_and_k(point_to_inspect, intersection_point, points_j_and_k, 
     )
     policy_k_new = in_case_1236 * policy_k_and_j[0] + in_case_45 * policy_k_and_j[1]
     policy_k_and_j = policy_k_new, policy_j_new
+
+    # Endog grid update
     endog_grid_j_new = (
         in_case_123 * endog_grid_k_and_j[1]
         + in_case_45 * endog_grid_to_inspect

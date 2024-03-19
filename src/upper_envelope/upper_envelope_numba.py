@@ -58,8 +58,6 @@ def fast_upper_envelope_wrapper(
             exogenous savings grid.
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        choice (int): The current choice.
-        compute_utility (callable): Function to compute the agent's utility.
 
     Returns:
         tuple:
@@ -662,8 +660,12 @@ def _backward_scan(
 
 @njit
 def _evaluate_point_on_line(
-    x1: float, y1: float, x2: float, y2: float, point_to_evaluate: float
-) -> float:
+    x1: float | np.ndarray,
+    y1: float | np.ndarray,
+    x2: float | np.ndarray,
+    y2: float | np.ndarray,
+    point_to_evaluate: float | np.ndarray,
+) -> float | np.ndarray:
     """Evaluate a point on a line.
 
     Args:
@@ -682,14 +684,14 @@ def _evaluate_point_on_line(
 
 @njit
 def _linear_intersection(
-    x1: float,
-    y1: float,
-    x2: float,
-    y2: float,
-    x3: float,
-    y3: float,
-    x4: float,
-    y4: float,
+    x1: float | np.ndarray,
+    y1: float | np.ndarray,
+    x2: float | np.ndarray,
+    y2: float | np.ndarray,
+    x3: float | np.ndarray,
+    y3: float | np.ndarray,
+    x4: float | np.ndarray,
+    y4: float | np.ndarray,
 ) -> Tuple[float, float]:
     """Find the intersection of two lines.
 
@@ -732,7 +734,7 @@ def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    expected_value_zero_savings: np.ndarray,
+    expected_value_zero_savings: float,
     min_wealth_grid: float,
     n_grid_wealth: int,
     utility_function: Callable,
@@ -758,11 +760,9 @@ def _augment_grids(
             discontinuities in the policy function.
             In the presence of discontinuities, the policy function is a
             "correspondence" rather than a function due to multiple local optima.
-        choice (int): The agent's choice.
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
         n_grid_wealth (int): Number of grid points in the exogenous wealth grid.
-        compute_utility (callable): Function to compute the agent's utility.
 
     Returns:
         tuple:
