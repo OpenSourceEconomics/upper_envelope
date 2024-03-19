@@ -4,6 +4,8 @@
 .pdf
 .npy
 
+# Sandbox
+sandbox/
 
 src/upper_envelope/_version.py
 
