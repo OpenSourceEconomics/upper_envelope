@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.upper_envelope_jax import fast_upper_envelope
-from upper_envelope.upper_envelope_jax import (
+from upper_envelope.fues_jax.upper_envelope_jax import fast_upper_envelope
+from upper_envelope.fues_jax.upper_envelope_jax import (
     fast_upper_envelope_wrapper,
 )
 
