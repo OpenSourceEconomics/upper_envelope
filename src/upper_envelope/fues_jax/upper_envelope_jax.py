@@ -316,8 +316,7 @@ def scan_body(
         - result (tuple): The result of this iteration. This is a tuple containing four
             elements to be saved in this iteration:
             - value
-            - left policy
-            - right policy
+            - policy
             - endogenous grid point
 
     """
@@ -430,11 +429,7 @@ def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, cases):
         idx_to_inspect (int): Index of the point to be inspected in the current
             iteration.
         update_idx (bool): Indicator if the index should be updated.
-        case_2 (bool): Indicator if we have reached the final point on the grid.
-        case_5 (bool): Indicator if we are in the situation where we added the
-            intersection point this iteration and add the point to inspect in the
-            next iteration.
-
+        cases (tuple): Tuple containing the indicators for the different cases.
     Returns:
         tuple:
 
