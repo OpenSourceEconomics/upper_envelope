@@ -288,8 +288,7 @@ def scan_body(
     Depending on the idx_to_inspect of the carry value, either a new value is scanned
     or the value from the last period is saved.
     The carry value is updated in each iteration and passed to the next iteration.
-    This scan body returns one value, two policy values (left and right)
-    as well as an endogenous grid value.
+    This scan body returns value, policy and endogenous wealth grid.
 
         Args:
             carry (tuple): The carry value passed from the previous iteration. This is a
@@ -560,7 +559,7 @@ def select_points_to_be_saved_next_iteration(
         tuple:
 
         - point_to_be_saved_next_iteration (tuple): Tuple containing the value,
-            policy left, policy right and endogenous grid point of the point to be
+            policy and endogenous grid point of the point to be
             saved in the next iteration.
 
     """
