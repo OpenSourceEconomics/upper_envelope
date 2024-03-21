@@ -124,6 +124,7 @@ def fast_upper_envelope_wrapper(
     )
 
 
+@njit
 def fast_upper_envelope(
     endog_grid: np.ndarray,
     value: np.ndarray,
@@ -201,6 +202,7 @@ def fast_upper_envelope(
     return endog_grid_refined, value_refined, policy_refined
 
 
+@njit
 def scan_value_function(
     endog_grid: np.ndarray,
     value: np.ndarray,
@@ -792,6 +794,7 @@ def _augment_grids(
     return grid_augmented, value_augmented, policy_augmented
 
 
+@njit
 def _initialize_refined_arrays(
     value: np.ndarray, policy: np.ndarray, endog_grid: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

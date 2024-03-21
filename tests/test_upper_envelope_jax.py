@@ -183,6 +183,7 @@ def test_fast_upper_envelope_against_numba(setup_model):
         expected_value_zero_savings=value_egm[1, 0],
         num_iter=int(1.2 * value_egm.shape[1]),
     )
+
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
     wealth_grid_to_test = jnp.linspace(
         endog_grid_refined[1], wealth_max_to_test, 1000, dtype=float

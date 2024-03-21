@@ -239,6 +239,10 @@ def scan_value_function(
     dummy_points_grid = jnp.array([jnp.nan, jnp.nan, jnp.nan])
 
     idx_to_inspect = 0
+    idx_to_be_saved_next = 0
+    # These get update before assigned to be saved next.
+    idx_result_array_valid = 0
+    idx_result_array_invalid = 0
     last_point_was_intersect = jnp.array(False)
     second_last_point_was_intersect = jnp.array(False)
     saved_last_point_already = jnp.array(False)
@@ -250,6 +254,9 @@ def scan_value_function(
         saved_last_point_already,
         last_point_was_intersect,
         second_last_point_was_intersect,
+        idx_result_array_valid,
+        idx_result_array_invalid,
+        idx_to_be_saved_next,
     )
     partial_body = partial(
         scan_body,
@@ -268,8 +275,12 @@ def scan_value_function(
         xs=None,
         length=num_iter,
     )
-
-    return result
+    result_arrays, sort_index = result
+    value, policy, endog_grid = result_arrays
+    value = value.at[sort_index].set(value)
+    policy = policy.at[sort_index].set(policy)
+    endog_grid = endog_grid.at[sort_index].set(endog_grid)
+    return value, policy, endog_grid
 
 
 def scan_body(
@@ -326,6 +337,9 @@ def scan_body(
         saved_last_point_already,
         last_point_was_intersect,
         second_last_point_was_intersect,
+        idx_result_array_valid,
+        idx_result_array_invalid,
+        idx_to_be_saved_this_period,
     ) = carry
 
     point_to_inspect = (
@@ -399,9 +413,14 @@ def scan_body(
         saved_last_point_already,
         last_point_was_intersect,
         second_last_point_was_intersect,
-    ) = update_bools_and_idx_to_inspect(
+        idx_to_save_next,
+        idx_result_array_valid,
+        idx_result_array_invalid,
+    ) = update_bools_and_idx(
         idx_to_inspect=idx_to_inspect,
         update_idx=update_idx,
+        idx_result_array_valid=idx_result_array_valid,
+        idx_result_array_invalid=idx_result_array_invalid,
         cases=cases,
     )
 
@@ -412,12 +431,17 @@ def scan_body(
         saved_last_point_already,
         last_point_was_intersect,
         second_last_point_was_intersect,
+        idx_result_array_valid,
+        idx_result_array_invalid,
+        idx_to_save_next,
     )
 
-    return carry, point_to_save_this_iteration
+    return carry, (point_to_save_this_iteration, idx_to_be_saved_this_period)
 
 
-def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, cases):
+def update_bools_and_idx(
+    idx_to_inspect, update_idx, idx_result_array_valid, idx_result_array_invalid, cases
+):
     """Update indicators and index of the point to be inspected in the next period.
 
     The indicators are booleans that capture cases where
@@ -443,6 +467,12 @@ def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, cases):
     case_0, case_1, case_2, case_3, case_4, case_5, case_6 = cases
     idx_to_inspect += update_idx
 
+    idx_result_array_valid += ~case_3
+    idx_result_array_invalid -= case_3
+    idx_to_save_next = idx_result_array_invalid * case_3 + idx_result_array_valid * (
+        1 - case_3
+    )
+
     # In the iteration where case_2 is True for the first time, the last point we
     # checked is selected and afterwards only nans are added.
     saved_last_point_already = case_2
@@ -454,6 +484,9 @@ def update_bools_and_idx_to_inspect(idx_to_inspect, update_idx, cases):
         saved_last_point_already,
         last_point_was_intersect,
         second_last_point_was_intersect,
+        idx_to_save_next,
+        idx_result_array_valid,
+        idx_result_array_invalid,
     )
 
 
@@ -585,7 +618,7 @@ def select_points_to_be_saved_next_iteration(
         case_0 * value_k_and_j[1]
         + case_1 * value_to_inspect
         + case_2 * value_case_2
-        + case_3 * planned_value
+        + jax.lax.select(case_3, on_true=jnp.nan, on_false=0.0)
         + case_4 * value_to_inspect
         + case_5 * intersect_value
         + case_6 * intersect_value
@@ -595,7 +628,7 @@ def select_points_to_be_saved_next_iteration(
         case_0 * policy_k_and_j[1]
         + case_1 * policy_to_inspect
         + case_2 * policy_case_2
-        + case_3 * planned_policy
+        + jax.lax.select(case_3, on_true=jnp.nan, on_false=0.0)
         + case_4 * policy_to_inspect
         + case_5 * intersect_policy_left
         + case_6 * intersect_policy_right
@@ -604,7 +637,7 @@ def select_points_to_be_saved_next_iteration(
         case_0 * endog_grid_k_and_j[1]
         + case_1 * endog_grid_to_inspect
         + case_2 * endog_grid_case_2
-        + case_3 * planned_endog_grid
+        + jax.lax.select(case_3, on_true=jnp.nan, on_false=0.0)
         + case_4 * endog_grid_to_inspect
         + case_5 * intersect_grid
         + case_6 * intersect_grid
