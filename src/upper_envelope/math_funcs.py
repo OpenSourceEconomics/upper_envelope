@@ -104,10 +104,10 @@ def calc_intersection_and_extrapolate_policy(
 
 
 def calc_gradient(
-    x1: float,
-    y1: float,
-    x2: float,
-    y2: float,
+    x1: float | jnp.ndarray,
+    y1: float | jnp.ndarray,
+    x2: float | jnp.ndarray,
+    y2: float | jnp.ndarray,
 ):
     """Calculate the gradient between two points.
 
@@ -127,8 +127,12 @@ def calc_gradient(
 
 
 def _evaluate_point_on_line(
-    x1: float, y1: float, x2: float, y2: float, point_to_evaluate: float
-) -> float:
+    x1: float | jnp.ndarray,
+    y1: float | jnp.ndarray,
+    x2: float | jnp.ndarray,
+    y2: float | jnp.ndarray,
+    point_to_evaluate: float | jnp.ndarray,
+) -> float | jnp.ndarray:
     """Evaluate a point on a line defined by (x1, y1) and (x2, y2).
 
     Args:
@@ -146,15 +150,15 @@ def _evaluate_point_on_line(
 
 
 def _find_linear_intersection(
-    x1: float,
-    y1: float,
-    x2: float,
-    y2: float,
-    x3: float,
-    y3: float,
-    x4: float,
-    y4: float,
-) -> Tuple[float, float]:
+    x1: float | jnp.ndarray,
+    y1: float | jnp.ndarray,
+    x2: float | jnp.ndarray,
+    y2: float | jnp.ndarray,
+    x3: float | jnp.ndarray,
+    y3: float | jnp.ndarray,
+    x4: float | jnp.ndarray,
+    y4: float | jnp.ndarray,
+) -> Tuple[float | jnp.ndarray, float | jnp.ndarray]:
     """Find the linear intersection of two lines.
 
     Args:
