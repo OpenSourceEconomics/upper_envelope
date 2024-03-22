@@ -98,6 +98,7 @@ def fast_upper_envelope_wrapper(
     grid_points_to_add = jnp.linspace(min_wealth_grid, endog_grid[0], points_to_add)[
         :-1
     ]
+
     values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
         grid_points_to_add,
         expected_value_zero_savings,

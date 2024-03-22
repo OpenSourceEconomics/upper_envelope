@@ -123,7 +123,7 @@ def determine_cases_and_conduct_necessary_scans(
     suboptimal_cond = switch_value_func_and_steep_increase_after | is_point_suboptimal
 
     # Same conditions as with forward scan.
-    is_back_ward_scan_needed = ~(
+    is_backward_scan_needed = ~(
         suboptimal_cond
         | last_point_was_intersect
         | is_final_point_on_grid
@@ -141,7 +141,7 @@ def determine_cases_and_conduct_necessary_scans(
         endog_grid_j=endog_grid_k_and_j[1],
         idx_to_scan_from=idx_to_scan_from,
         n_points_to_scan=n_points_to_scan,
-        is_scan_needed=is_back_ward_scan_needed,
+        is_scan_needed=is_backward_scan_needed,
         jump_thresh=jump_thresh,
     )
 
