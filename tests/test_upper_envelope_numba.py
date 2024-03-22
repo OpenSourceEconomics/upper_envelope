@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.upper_envelope_numba import fast_upper_envelope
-from upper_envelope.upper_envelope_numba import fast_upper_envelope_wrapper
+from upper_envelope.fues_numba.fues_numba import fast_upper_envelope
+from upper_envelope.fues_numba.fues_numba import fast_upper_envelope_wrapper
 
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
 from tests.utils.interpolation import interpolate_single_policy_and_value_on_wealth_grid

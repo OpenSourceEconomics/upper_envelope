@@ -6,11 +6,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope import upper_envelope_numba as fues_np
-from upper_envelope.fues_jax.upper_envelope_jax import fast_upper_envelope
-from upper_envelope.fues_jax.upper_envelope_jax import (
+from upper_envelope.fues_jax.fues_jax import fast_upper_envelope
+from upper_envelope.fues_jax.fues_jax import (
     fast_upper_envelope_wrapper,
 )
+from upper_envelope.fues_numba import fues_numba as fues_nb
 
 from tests.utils.interpolation import interpolate_policy_and_value_on_wealth_grid
 from tests.utils.interpolation import linear_interpolation_with_extrapolation
@@ -165,7 +165,7 @@ def test_fast_upper_envelope_against_numba(setup_model):
     )
     _params, exog_savings_grid, state_choice_vars = setup_model
 
-    endog_grid_org, value_org, policy_org = fues_np.fast_upper_envelope(
+    endog_grid_org, value_org, policy_org = fues_nb.fast_upper_envelope(
         endog_grid=policy_egm[0],
         value=value_egm[1],
         policy=policy_egm[1],
