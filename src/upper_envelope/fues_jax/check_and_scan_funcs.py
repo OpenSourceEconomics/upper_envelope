@@ -380,13 +380,13 @@ def back_and_forward_scan_wrapper(
     endog_grid_to_scan_from: float | jnp.ndarray,
     policy_to_scan_from: float | jnp.ndarray,
     endog_grid: float | jnp.ndarray,
-    value,
-    policy,
-    idx_to_scan_from,
-    n_points_to_scan,
-    is_scan_needed,
-    jump_thresh,
-    direction,
+    value: jnp.ndarray,
+    policy: jnp.ndarray,
+    idx_to_scan_from: int,
+    n_points_to_scan: int,
+    is_scan_needed: bool,
+    jump_thresh: float,
+    direction: str,
 ):
     """Wrapper function to execute the backwards and forward scan.
 
@@ -401,14 +401,16 @@ def back_and_forward_scan_wrapper(
         policy_to_scan_from (float): The policy function point to scan from. We want to
             find the grid point which is on the same value function segment as the point
             we scan from.
-        idx_to_scan_from (int): Index of the point we want to scan from. This should
-            be the current point we inspect.
         endog_grid (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined endogenous wealth grid.
         value (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined value correspondence.
         policy (np.ndarray): 1d array of shape (n_grid_wealth,) containing the
             unrefined policy correspondence.
+        idx_to_scan_from (int): Index of the point we want to scan from. This should
+            be the current point we inspect.
+        n_points_to_scan (int): Number of points to scan.
+        is_scan_needed (bool): Indicator if the scan is needed.
         n_points_to_scan (int): Number of points to scan.
         jump_thresh (float): Threshold for the jump in the value function.
         direction (str): The direction of the scan. Either 'forward' or 'backward'.

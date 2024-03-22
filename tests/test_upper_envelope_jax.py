@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal as aaae
+from upper_envelope.fues_jax.check_and_scan_funcs import back_and_forward_scan_wrapper
 from upper_envelope.fues_jax.fues_jax import fast_upper_envelope
 from upper_envelope.fues_jax.fues_jax import (
     fast_upper_envelope_wrapper,
@@ -277,3 +278,23 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
     )
     aaae(value_interp, value_expec_interp)
     aaae(policy_interp, policy_expec_interp)
+
+
+def test_back_and_forward_scan_wrapper_direction_flag():
+    msg = "Direction must be either 'forward' or 'backward'."
+
+    with pytest.raises(ValueError, match=msg):
+        back_and_forward_scan_wrapper(
+            endog_grid_to_calculate_gradient=0.6,
+            value_to_calculate_gradient=0.5,
+            endog_grid_to_scan_from=1.2,
+            policy_to_scan_from=0.7,
+            endog_grid=1,
+            value=np.arange(2, 5),
+            policy=np.arange(1, 4),
+            idx_to_scan_from=2,
+            n_points_to_scan=3,
+            is_scan_needed=False,
+            jump_thresh=2,
+            direction="Don't know",
+        )
