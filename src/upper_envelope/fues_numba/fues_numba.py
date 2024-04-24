@@ -782,7 +782,7 @@ def _augment_grids(
     )[:-1]
 
     utility = utility_function(
-        grid_points_to_add,
+        consumption=grid_points_to_add,
         **utility_kwargs,
     )
     values_to_add = utility + discount_factor * expected_value_zero_savings
