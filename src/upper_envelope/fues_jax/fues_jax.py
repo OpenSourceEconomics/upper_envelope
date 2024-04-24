@@ -797,7 +797,7 @@ def _compute_value(
     consumption, next_period_value, utility_function, utility_kwargs, discount_factor
 ):
     utility = utility_function(
-        consumption,
+        consumption=consumption,
         **utility_kwargs,
     )
     return utility + discount_factor * next_period_value
