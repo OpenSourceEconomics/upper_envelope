@@ -80,7 +80,8 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    min_wealth_grid = np.min(endog_grid)
+    min_id = np.argmin(endog_grid)
+    min_wealth_grid = endog_grid[min_id]
     # These tuning parameters should be set outside. Don't want to touch solve.py now
     points_to_add = len(endog_grid) // 10
     num_iter = int(1.2 * value.shape[0])
@@ -98,7 +99,7 @@ def fast_upper_envelope_wrapper(
     grid_points_to_add = jnp.linspace(min_wealth_grid, endog_grid[0], points_to_add)[
         :-1
     ]
-
+    # Compute closed form values
     values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
         grid_points_to_add,
         expected_value_zero_savings,
@@ -106,6 +107,12 @@ def fast_upper_envelope_wrapper(
         utility_kwargs,
         disc_factor,
     )
+
+    # Now determine if we actually had to extend the grid. If not, we just add nans.
+    no_need_to_add = min_id == 0
+    multiplikator = jax.lax.select(no_need_to_add, jnp.nan, 1.0)
+    grid_points_to_add *= multiplikator
+    values_to_add *= multiplikator
 
     grid_augmented = jnp.append(grid_points_to_add, endog_grid)
     value_augmented = jnp.append(values_to_add, value)
@@ -350,6 +357,8 @@ def scan_body(
     )
 
     is_final_point_on_grid = idx_to_inspect == len(endog_grid) - 1
+    end_of_valid_points = jnp.isnan(value[idx_to_inspect])
+    is_final_point_on_grid = is_final_point_on_grid | end_of_valid_points
 
     (
         cases,
