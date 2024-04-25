@@ -116,6 +116,13 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         "choice": state_choice_vars["choice"],
         "params": params,
     }
+    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    tuning_params = {
+        "n_final_wealth_grid": n_final_wealth_grid,
+        "jump_thresh": 2,
+        "n_constrained_points_to_add": n_constrained_points_to_add,
+    }
     (
         endog_grid_refined,
         policy_refined,
@@ -128,6 +135,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         utility_function=utility_crra,
         utility_kwargs=utility_kwargs,
         disc_factor=params["beta"],
+        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -172,6 +180,13 @@ def test_fast_upper_envelope_against_numba(setup_model):
         policy=policy_egm[1],
         exog_grid=np.append(0, exog_savings_grid),
     )
+    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    tuning_params = {
+        "n_final_wealth_grid": n_final_wealth_grid,
+        "jump_thresh": 2,
+        "n_constrained_points_to_add": n_constrained_points_to_add,
+    }
 
     (
         endog_grid_refined,
@@ -182,7 +197,7 @@ def test_fast_upper_envelope_against_numba(setup_model):
         value=value_egm[1, 1:],
         policy=policy_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        num_iter=int(1.2 * value_egm.shape[1]),
+        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -245,6 +260,13 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         "choice": state_choice_vec["choice"],
         "params": params,
     }
+    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    tuning_params = {
+        "n_final_wealth_grid": n_final_wealth_grid,
+        "jump_thresh": 2,
+        "n_constrained_points_to_add": n_constrained_points_to_add,
+    }
 
     (
         endog_grid_fues,
@@ -258,10 +280,11 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         utility_function=utility_crra,
         utility_kwargs=utility_kwargs,
         disc_factor=params["beta"],
+        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100
-    wealth_grid_to_test = np.linspace(endog_grid_fues[1], wealth_max_to_test, 1000)
+    wealth_grid_to_test = jnp.linspace(endog_grid_fues[1], wealth_max_to_test, 1000)
 
     value_expec_interp = linear_interpolation_with_extrapolation(
         x_new=wealth_grid_to_test, x=value_expected[0], y=value_expected[1]

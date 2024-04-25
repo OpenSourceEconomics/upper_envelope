@@ -31,6 +31,7 @@ def fast_upper_envelope_wrapper(
     utility_function: Callable,
     utility_kwargs: Dict,
     disc_factor: float,
+    tuning_params: Dict,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Drop suboptimal points and refines the endogenous grid, policy, and value.
 
@@ -82,10 +83,8 @@ def fast_upper_envelope_wrapper(
     """
     min_id = np.argmin(endog_grid)
     min_wealth_grid = endog_grid[min_id]
-    # These tuning parameters should be set outside. Don't want to touch solve.py now
-    points_to_add = len(endog_grid) // 10
-    num_iter = int(1.2 * value.shape[0])
-    jump_thresh = 2
+
+    points_to_add = tuning_params["n_constrained_points_to_add"]
     # Non-concave region coincides with credit constraint.
     # This happens when there is a non-monotonicity in the endogenous wealth grid
     # that goes below the first point.
@@ -127,8 +126,7 @@ def fast_upper_envelope_wrapper(
         value_augmented,
         policy_augmented,
         expected_value_zero_savings,
-        num_iter=num_iter,
-        jump_thresh=jump_thresh,
+        tuning_params=tuning_params,
     )
     return (
         endog_grid_refined,
@@ -142,8 +140,7 @@ def fast_upper_envelope(
     value: jnp.ndarray,
     policy: jnp.ndarray,
     expected_value_zero_savings: float,
-    num_iter: int,
-    jump_thresh: Optional[float] = 2,
+    tuning_params: Dict,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
@@ -186,6 +183,9 @@ def fast_upper_envelope(
     value = jnp.take(value, idx_sort)
     policy = jnp.take(policy, idx_sort)
     endog_grid = jnp.take(endog_grid, idx_sort)
+
+    num_iter = tuning_params["n_final_wealth_grid"]
+    jump_thresh = tuning_params["jump_thresh"]
 
     (
         value_refined,
