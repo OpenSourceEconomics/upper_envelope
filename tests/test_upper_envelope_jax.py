@@ -117,7 +117,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         "params": params,
     }
     n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
     tuning_params = {
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
@@ -181,7 +181,7 @@ def test_fast_upper_envelope_against_numba(setup_model):
         exog_grid=np.append(0, exog_savings_grid),
     )
     n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
     tuning_params = {
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
@@ -261,7 +261,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         "params": params,
     }
     n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0]) + n_constrained_points_to_add))
+    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
     tuning_params = {
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
