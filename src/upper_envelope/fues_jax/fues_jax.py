@@ -84,7 +84,7 @@ def fast_upper_envelope_wrapper(
     min_id = np.argmin(endog_grid)
     min_wealth_grid = endog_grid[min_id]
 
-    points_to_add = tuning_params["n_constrained_points_to_add"]
+    n_constrained_points_to_add = tuning_params["n_constrained_points_to_add"]
     # Non-concave region coincides with credit constraint.
     # This happens when there is a non-monotonicity in the endogenous wealth grid
     # that goes below the first point.
@@ -95,9 +95,9 @@ def fast_upper_envelope_wrapper(
 
     # This is the condition, which we do not use at the moment.
     # closed_form_cond = min_wealth_grid < endog_grid[0]
-    grid_points_to_add = jnp.linspace(min_wealth_grid, endog_grid[0], points_to_add)[
-        :-1
-    ]
+    grid_points_to_add = jnp.linspace(
+        min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
+    )[:-1]
     # Compute closed form values
     values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
         grid_points_to_add,
@@ -107,7 +107,8 @@ def fast_upper_envelope_wrapper(
         disc_factor,
     )
 
-    # Now determine if we actually had to extend the grid. If not, we just add nans.
+    # Now determine if n_constrained_points_to_addwe actually had to extend the grid.
+    # If not, we just add nans.
     no_need_to_add = min_id == 0
     multiplikator = jax.lax.select(no_need_to_add, jnp.nan, 1.0)
     grid_points_to_add *= multiplikator
@@ -184,9 +185,6 @@ def fast_upper_envelope(
     policy = jnp.take(policy, idx_sort)
     endog_grid = jnp.take(endog_grid, idx_sort)
 
-    num_iter = tuning_params["n_final_wealth_grid"]
-    jump_thresh = tuning_params["jump_thresh"]
-
     (
         value_refined,
         policy_refined,
@@ -196,9 +194,9 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         expected_value_zero_savings=expected_value_zero_savings,
-        num_iter=num_iter,
-        jump_thresh=jump_thresh,
-        n_points_to_scan=10,
+        num_iter=tuning_params["n_final_wealth_grid"],
+        jump_thresh=tuning_params["jump_thresh"],
+        n_points_to_scan=tuning_params["n_points_to_scan"],
     )
 
     return endog_grid_refined, value_refined, policy_refined

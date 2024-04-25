@@ -122,6 +122,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
         "n_constrained_points_to_add": n_constrained_points_to_add,
+        "n_points_to_scan": 10,
     }
     (
         endog_grid_refined,
@@ -174,19 +175,22 @@ def test_fast_upper_envelope_against_numba(setup_model):
     )
     _params, exog_savings_grid, state_choice_vars = setup_model
 
-    endog_grid_org, value_org, policy_org = fues_nb.fast_upper_envelope(
-        endog_grid=policy_egm[0],
-        value=value_egm[1],
-        policy=policy_egm[1],
-        exog_grid=np.append(0, exog_savings_grid),
-    )
     n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
     n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
     tuning_params = {
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
         "n_constrained_points_to_add": n_constrained_points_to_add,
+        "n_points_to_scan": 10,
     }
+
+    endog_grid_org, value_org, policy_org = fues_nb.fast_upper_envelope(
+        endog_grid=policy_egm[0],
+        value=value_egm[1],
+        policy=policy_egm[1],
+        exog_grid=np.append(0, exog_savings_grid),
+        tuning_params=tuning_params,
+    )
 
     (
         endog_grid_refined,
@@ -266,6 +270,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         "n_final_wealth_grid": n_final_wealth_grid,
         "jump_thresh": 2,
         "n_constrained_points_to_add": n_constrained_points_to_add,
+        "n_points_to_scan": 10,
     }
 
     (

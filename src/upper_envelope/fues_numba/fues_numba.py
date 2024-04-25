@@ -23,6 +23,7 @@ def fast_upper_envelope_wrapper(
     utility_function: Callable,
     utility_kwargs: Dict,
     discount_factor: float,
+    tuning_params,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop suboptimal points and refine the endogenous grid, policy, and value.
 
@@ -70,7 +71,7 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    n_grid_wealth = len(endog_grid)
+    len(endog_grid)
     min_wealth_grid = np.min(endog_grid)
     # exog_grid = np.append(
     #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
@@ -83,18 +84,20 @@ def fast_upper_envelope_wrapper(
         # Solution: Value function to the left of the first point is analytical,
         # so we just need to add some points to the left of the first grid point.
 
+        n_constrained_points_to_add = tuning_params["n_constrained_points_to_add"]
+
         endog_grid, value, policy = _augment_grids(
             endog_grid=endog_grid,
             value=value,
             policy=policy,
             expected_value_zero_savings=expected_value_zero_savings,
             min_wealth_grid=min_wealth_grid,
-            n_grid_wealth=n_grid_wealth,
+            n_constrained_points_to_add=n_constrained_points_to_add,
             utility_function=utility_function,
             utility_kwargs=utility_kwargs,
             discount_factor=discount_factor,
         )
-        exog_grid = np.append(np.zeros(n_grid_wealth // 10 - 1), exog_grid)
+        exog_grid = np.append(np.zeros(n_constrained_points_to_add), exog_grid)
 
     endog_grid = np.append(0, endog_grid)
     policy = np.append(0, policy)
@@ -102,13 +105,13 @@ def fast_upper_envelope_wrapper(
     exog_grid = np.append(0, exog_grid)
 
     endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
-        endog_grid, value, policy, exog_grid, jump_thresh=2
+        endog_grid, value, policy, exog_grid, tuning_params
     )
 
     # Fill array with nans to fit 10% extra grid points
-    endog_grid_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
-    policy_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
-    value_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
+    endog_grid_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
+    policy_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
+    value_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
     endog_grid_refined_with_nans[:] = np.nan
     policy_refined_with_nans[:] = np.nan
     value_refined_with_nans[:] = np.nan
@@ -130,8 +133,7 @@ def fast_upper_envelope(
     value: np.ndarray,
     policy: np.ndarray,
     exog_grid: np.ndarray,
-    jump_thresh: Optional[float] = 2,
-    lower_bound_wealth: Optional[float] = 1e-10,
+    tuning_params,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
@@ -163,11 +165,11 @@ def fast_upper_envelope(
     """
     # TODO: determine locations where endogenous grid points are # noqa: T000
     # equal to the lower bound
-    mask = endog_grid <= lower_bound_wealth
-    if np.any(mask):
-        max_value_lower_bound = np.nanmax(value[mask])
-        mask &= value < max_value_lower_bound
-        value[mask] = np.nan
+    # mask = endog_grid <= tuning_params["lower_bound_wealth"]
+    # if np.any(mask):
+    #     max_value_lower_bound = np.nanmax(value[mask])
+    #     mask &= value < max_value_lower_bound
+    #     value[mask] = np.nan
 
     endog_grid = endog_grid[np.where(~np.isnan(value))[0]]
     policy = policy[np.where(~np.isnan(value))]
@@ -189,8 +191,8 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         exog_grid=exog_grid,
-        jump_thresh=jump_thresh,
-        n_points_to_scan=10,
+        jump_thresh=tuning_params["jump_thresh"],
+        n_points_to_scan=tuning_params["n_points_to_scan"],
     )
 
     endog_grid_refined = endog_grid_clean_with_nans[
@@ -738,7 +740,7 @@ def _augment_grids(
     policy: np.ndarray,
     expected_value_zero_savings: float,
     min_wealth_grid: float,
-    n_grid_wealth: int,
+    n_constrained_points_to_add: int,
     utility_function: Callable,
     utility_kwargs: Dict[str, float],
     discount_factor: float,
@@ -778,7 +780,7 @@ def _augment_grids(
 
     """
     grid_points_to_add = np.linspace(
-        min_wealth_grid, endog_grid[0], n_grid_wealth // 10
+        min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
     )[:-1]
 
     utility = utility_function(
