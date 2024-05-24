@@ -14,6 +14,7 @@ import numpy as np
 from numba import njit
 
 
+@njit
 def fast_upper_envelope_wrapper(
     endog_grid: np.ndarray,
     policy: np.ndarray,
@@ -84,7 +85,7 @@ def fast_upper_envelope_wrapper(
         # Solution: Value function to the left of the first point is analytical,
         # so we just need to add some points to the left of the first grid point.
 
-        n_constrained_points_to_add = tuning_params["n_constrained_points_to_add"]
+        n_constrained_points_to_add = tuning_params.n_constrained_points_to_add
 
         endog_grid, value, policy = _augment_grids(
             endog_grid=endog_grid,
@@ -108,10 +109,12 @@ def fast_upper_envelope_wrapper(
         endog_grid, value, policy, exog_grid, tuning_params
     )
 
+    n_final_wealth_grid = tuning_params.n_final_wealth_grid
+
     # Fill array with nans to fit 10% extra grid points
-    endog_grid_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
-    policy_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
-    value_refined_with_nans = np.empty(tuning_params["n_final_wealth_grid"])
+    endog_grid_refined_with_nans = np.empty(n_final_wealth_grid)
+    policy_refined_with_nans = np.empty(n_final_wealth_grid)
+    value_refined_with_nans = np.empty(n_final_wealth_grid)
     endog_grid_refined_with_nans[:] = np.nan
     policy_refined_with_nans[:] = np.nan
     value_refined_with_nans[:] = np.nan
@@ -191,8 +194,8 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         exog_grid=exog_grid,
-        jump_thresh=tuning_params["jump_thresh"],
-        n_points_to_scan=tuning_params["n_points_to_scan"],
+        jump_thresh=tuning_params.jump_thresh,
+        n_points_to_scan=tuning_params.n_points_to_scan,
     )
 
     endog_grid_refined = endog_grid_clean_with_nans[
@@ -734,6 +737,7 @@ def _append_index(x_array: np.ndarray, m: int):
     return x_array
 
 
+@njit
 def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
@@ -784,8 +788,8 @@ def _augment_grids(
     )[:-1]
 
     utility = utility_function(
-        consumption=grid_points_to_add,
-        **utility_kwargs,
+        grid_points_to_add,
+        utility_kwargs,
     )
     values_to_add = utility + discount_factor * expected_value_zero_savings
 
