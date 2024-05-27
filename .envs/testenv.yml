@@ -1,10 +1,8 @@
 ---
 name: upper-envelope
-
 channels:
   - conda-forge
   - nodefaults
-
 dependencies:
   - pip
   - setuptools_scm

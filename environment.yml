@@ -1,10 +1,8 @@
 ---
 name: upper-envelope
-
 channels:
   - conda-forge
   - defaults
-
 dependencies:
   - python=3.10
   - pip
@@ -37,7 +35,6 @@ dependencies:
   - conda-build
   - conda-verify
   - tox-conda
-
   - pip:
       - blackcellmagic
       - furo
