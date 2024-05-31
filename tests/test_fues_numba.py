@@ -89,15 +89,19 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
 
     params, state_choice_vec, _exog_savings_grid = setup_model
 
+    def value_func(consumption, choice, params):
+        return (
+            utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
+        )
+
     endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
         exog_grid=_exog_savings_grid,
-        utility_function=utility_crra,
-        utility_args=(state_choice_vec["choice"], params),
-        discount_factor=params["beta"],
+        value_function=value_func,
+        value_function_args=(state_choice_vec["choice"], params),
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -189,15 +193,19 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         ~np.isnan(_value_fedor).any(axis=0),
     ]
 
+    def value_func(consumption, choice, params):
+        return (
+            utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
+        )
+
     endog_grid_fues, policy_fues, value_fues = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         exog_grid=np.append(0, exog_savings_grid),
         expected_value_zero_savings=value_egm[1, 0],
-        utility_function=utility_crra,
-        utility_args=(state_choice_vec["choice"], params),
-        discount_factor=params["beta"],
+        value_function=value_func,
+        value_function_args=(state_choice_vec["choice"], params),
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100

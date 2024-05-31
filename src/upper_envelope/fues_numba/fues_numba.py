@@ -20,9 +20,8 @@ def fast_upper_envelope_wrapper(
     value: np.ndarray,
     exog_grid: np.ndarray,
     expected_value_zero_savings: float,
-    utility_function: Callable,
-    utility_args: Tuple,
-    discount_factor: float,
+    value_function: Callable,
+    value_function_args: Tuple,
     n_constrained_points_to_add=None,
     n_final_wealth_grid=None,
     jump_thresh=2,
@@ -97,12 +96,10 @@ def fast_upper_envelope_wrapper(
             endog_grid=endog_grid,
             value=value,
             policy=policy,
-            expected_value_zero_savings=expected_value_zero_savings,
             min_wealth_grid=min_wealth_grid,
             n_constrained_points_to_add=n_constrained_points_to_add,
-            utility_function=utility_function,
-            utility_args=utility_args,
-            discount_factor=discount_factor,
+            value_function=value_function,
+            value_function_args=value_function_args,
         )
         exog_grid = np.append(np.zeros(n_constrained_points_to_add), exog_grid)
 
@@ -755,12 +752,10 @@ def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    expected_value_zero_savings: float,
     min_wealth_grid: float,
     n_constrained_points_to_add: int,
-    utility_function: Callable,
-    utility_args: Tuple,
-    discount_factor: float,
+    value_function: Callable,
+    value_function_args: Tuple,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extends the endogenous wealth grid, value, and policy functions to the left.
 
@@ -800,11 +795,10 @@ def _augment_grids(
         min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
     )[:-1]
 
-    utility = utility_function(
-        grid_points_to_add,
-        *utility_args,
-    )
-    values_to_add = utility + discount_factor * expected_value_zero_savings
+    values_to_add = np.empty_like(grid_points_to_add)
+
+    for i, grid_point in enumerate(grid_points_to_add):
+        values_to_add[i] = value_function(grid_point, *value_function_args)
 
     grid_augmented = np.append(grid_points_to_add, endog_grid)
     value_augmented = np.append(values_to_add, value)
