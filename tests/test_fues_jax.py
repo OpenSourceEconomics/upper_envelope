@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Dict
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -16,6 +17,8 @@ from upper_envelope.fues_numba import fues_numba as fues_nb
 from tests.utils.interpolation import interpolate_policy_and_value_on_wealth_grid
 from tests.utils.interpolation import linear_interpolation_with_extrapolation
 from tests.utils.upper_envelope_fedor import upper_envelope
+
+jax.config.update("jax_enable_x64", True)
 
 # Obtain the test directory of the package.
 TEST_DIR = Path(__file__).parent
@@ -116,14 +119,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         "choice": state_choice_vars["choice"],
         "params": params,
     }
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
+
     (
         endog_grid_refined,
         policy_refined,
@@ -136,7 +132,6 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         utility_function=utility_crra,
         utility_kwargs=utility_kwargs,
         disc_factor=params["beta"],
-        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -175,33 +170,22 @@ def test_fast_upper_envelope_against_numba(setup_model):
     )
     _params, exog_savings_grid, state_choice_vars = setup_model
 
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
-
     endog_grid_org, value_org, policy_org = fues_nb.fast_upper_envelope(
         endog_grid=policy_egm[0],
         value=value_egm[1],
         policy=policy_egm[1],
         exog_grid=np.append(0, exog_savings_grid),
-        tuning_params=tuning_params,
     )
 
     (
         endog_grid_refined,
         value_refined,
         policy_refined,
-    ) = fast_upper_envelope(
+    ) = jax.jit(fast_upper_envelope)(
         endog_grid=policy_egm[0, 1:],
         value=value_egm[1, 1:],
         policy=policy_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -264,20 +248,12 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         "choice": state_choice_vec["choice"],
         "params": params,
     }
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
 
     (
         endog_grid_fues,
         policy_fues,
         value_fues,
-    ) = fast_upper_envelope_wrapper(
+    ) = jax.jit(fast_upper_envelope_wrapper, static_argnums=(4, 7))(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
@@ -285,7 +261,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         utility_function=utility_crra,
         utility_kwargs=utility_kwargs,
         disc_factor=params["beta"],
-        tuning_params=tuning_params,
+        n_constrained_points_to_add=len(policy_egm[0, 1:]) // 10,
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100

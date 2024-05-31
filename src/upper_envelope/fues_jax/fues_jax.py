@@ -31,7 +31,10 @@ def fast_upper_envelope_wrapper(
     utility_function: Callable,
     utility_kwargs: Dict,
     disc_factor: float,
-    tuning_params: Dict,
+    n_constrained_points_to_add=None,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Drop suboptimal points and refines the endogenous grid, policy, and value.
 
@@ -81,10 +84,13 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    min_id = np.argmin(endog_grid)
-    min_wealth_grid = endog_grid[min_id]
+    # Set default of n_constrained_points_to_add to 10% of the grid size
+    n_constrained_points_to_add = (
+        endog_grid.shape[0] // 10
+        if n_constrained_points_to_add is None
+        else n_constrained_points_to_add
+    )
 
-    n_constrained_points_to_add = tuning_params["n_constrained_points_to_add"]
     # Non-concave region coincides with credit constraint.
     # This happens when there is a non-monotonicity in the endogenous wealth grid
     # that goes below the first point.
@@ -92,6 +98,8 @@ def fast_upper_envelope_wrapper(
     # so we just need to add some points to the left of the first grid point.
     # We do that independent of whether the condition is fulfilled or not.
     # If the condition is not fulfilled this is points_to_add times the same point.
+    min_id = np.argmin(endog_grid)
+    min_wealth_grid = endog_grid[min_id]
 
     # This is the condition, which we do not use at the moment.
     # closed_form_cond = min_wealth_grid < endog_grid[0]
@@ -127,7 +135,9 @@ def fast_upper_envelope_wrapper(
         value_augmented,
         policy_augmented,
         expected_value_zero_savings,
-        tuning_params=tuning_params,
+        n_final_wealth_grid=n_final_wealth_grid,
+        jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
     )
     return (
         endog_grid_refined,
@@ -141,7 +151,9 @@ def fast_upper_envelope(
     value: jnp.ndarray,
     policy: jnp.ndarray,
     expected_value_zero_savings: float,
-    tuning_params: Dict,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
@@ -180,6 +192,11 @@ def fast_upper_envelope(
     #     mask &= value < max_value_lower_bound
     #     value[mask] = jnp.nan
 
+    # Set default value of final grid size to 1.2 times current if not defined
+    n_final_wealth_grid = (
+        int(1.2 * (len(policy))) if n_final_wealth_grid is None else n_final_wealth_grid
+    )
+
     idx_sort = jnp.argsort(endog_grid)
     value = jnp.take(value, idx_sort)
     policy = jnp.take(policy, idx_sort)
@@ -194,9 +211,9 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         expected_value_zero_savings=expected_value_zero_savings,
-        num_iter=tuning_params["n_final_wealth_grid"],
-        jump_thresh=tuning_params["jump_thresh"],
-        n_points_to_scan=tuning_params["n_points_to_scan"],
+        n_final_wealth_grid=n_final_wealth_grid,
+        jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
     )
 
     return endog_grid_refined, value_refined, policy_refined
@@ -207,7 +224,7 @@ def scan_value_function(
     value: jnp.ndarray,
     policy: jnp.ndarray,
     expected_value_zero_savings,
-    num_iter: int,
+    n_final_wealth_grid: int,
     jump_thresh: float,
     n_points_to_scan: Optional[int] = 0,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
@@ -279,7 +296,7 @@ def scan_value_function(
         partial_body,
         carry_init,
         xs=None,
-        length=num_iter,
+        length=n_final_wealth_grid,
     )
     result_arrays, sort_index = result
     value, policy, endog_grid = result_arrays

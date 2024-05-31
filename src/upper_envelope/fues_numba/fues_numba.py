@@ -6,7 +6,6 @@ https://dx.doi.org/10.2139/ssrn.4181302
 
 """
 from typing import Callable
-from typing import Dict
 from typing import Optional
 from typing import Tuple
 
@@ -22,9 +21,12 @@ def fast_upper_envelope_wrapper(
     exog_grid: np.ndarray,
     expected_value_zero_savings: float,
     utility_function: Callable,
-    utility_kwargs: Dict,
+    utility_args: Tuple,
     discount_factor: float,
-    tuning_params,
+    n_constrained_points_to_add=None,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop suboptimal points and refine the endogenous grid, policy, and value.
 
@@ -72,7 +74,6 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    len(endog_grid)
     min_wealth_grid = np.min(endog_grid)
     # exog_grid = np.append(
     #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
@@ -85,7 +86,12 @@ def fast_upper_envelope_wrapper(
         # Solution: Value function to the left of the first point is analytical,
         # so we just need to add some points to the left of the first grid point.
 
-        n_constrained_points_to_add = tuning_params.n_constrained_points_to_add
+        # Set default of n_constrained_points_to_add to 10% of the grid size
+        n_constrained_points_to_add = (
+            endog_grid.shape[0] // 10
+            if n_constrained_points_to_add is None
+            else n_constrained_points_to_add
+        )
 
         endog_grid, value, policy = _augment_grids(
             endog_grid=endog_grid,
@@ -95,7 +101,7 @@ def fast_upper_envelope_wrapper(
             min_wealth_grid=min_wealth_grid,
             n_constrained_points_to_add=n_constrained_points_to_add,
             utility_function=utility_function,
-            utility_kwargs=utility_kwargs,
+            utility_args=utility_args,
             discount_factor=discount_factor,
         )
         exog_grid = np.append(np.zeros(n_constrained_points_to_add), exog_grid)
@@ -106,10 +112,18 @@ def fast_upper_envelope_wrapper(
     exog_grid = np.append(0, exog_grid)
 
     endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
-        endog_grid, value, policy, exog_grid, tuning_params
+        endog_grid,
+        value,
+        policy,
+        exog_grid,
+        jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
     )
 
-    n_final_wealth_grid = tuning_params.n_final_wealth_grid
+    # Set default value of final grid size to 1.2 times current if not defined
+    n_final_wealth_grid = (
+        int(1.2 * (len(policy))) if n_final_wealth_grid is None else n_final_wealth_grid
+    )
 
     # Fill array with nans to fit 10% extra grid points
     endog_grid_refined_with_nans = np.empty(n_final_wealth_grid)
@@ -136,7 +150,8 @@ def fast_upper_envelope(
     value: np.ndarray,
     policy: np.ndarray,
     exog_grid: np.ndarray,
-    tuning_params,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
@@ -194,8 +209,8 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         exog_grid=exog_grid,
-        jump_thresh=tuning_params.jump_thresh,
-        n_points_to_scan=tuning_params.n_points_to_scan,
+        jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
     )
 
     endog_grid_refined = endog_grid_clean_with_nans[
@@ -213,7 +228,7 @@ def scan_value_function(
     value: np.ndarray,
     policy: np.ndarray,
     exog_grid: np.ndarray,
-    jump_thresh: float,
+    jump_thresh: Optional[float] = 2,
     n_points_to_scan: Optional[int] = 0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Scan the value function to remove suboptimal points and add intersection points.
@@ -746,7 +761,7 @@ def _augment_grids(
     min_wealth_grid: float,
     n_constrained_points_to_add: int,
     utility_function: Callable,
-    utility_kwargs: Dict[str, float],
+    utility_args: Tuple,
     discount_factor: float,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extends the endogenous wealth grid, value, and policy functions to the left.
@@ -789,7 +804,7 @@ def _augment_grids(
 
     utility = utility_function(
         grid_points_to_add,
-        utility_kwargs,
+        *utility_args,
     )
     values_to_add = utility + discount_factor * expected_value_zero_savings
 

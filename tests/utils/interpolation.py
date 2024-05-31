@@ -58,10 +58,10 @@ def interpolate_policy_and_value_on_wealth_grid(
 
 
 def interpolate_single_policy_and_value_on_wealth_grid(
-    wealth_beginning_of_period: jnp.ndarray,
-    endog_wealth_grid: jnp.ndarray,
-    policy_grid: jnp.ndarray,
-    value_grid: jnp.ndarray,
+    wealth_beginning_of_period,
+    endog_wealth_grid,
+    policy_grid,
+    value_grid,
 ):
     """Interpolate policy and value functions on the wealth grid.
 

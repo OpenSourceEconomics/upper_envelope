@@ -89,19 +89,6 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
 
     params, state_choice_vec, _exog_savings_grid = setup_model
 
-    utility_kwargs = {
-        "choice": state_choice_vec["choice"],
-        "params": params,
-    }
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
-
     endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
@@ -109,9 +96,8 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         expected_value_zero_savings=value_egm[1, 0],
         exog_grid=_exog_savings_grid,
         utility_function=utility_crra,
-        utility_kwargs=utility_kwargs,
+        utility_args=(state_choice_vec["choice"], params),
         discount_factor=params["beta"],
-        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -151,21 +137,11 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
 
     _params, state_choice_vec, exog_savings_grid = setup_model
 
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
-
     endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
         endog_grid=policy_egm[0],
         value=value_egm[1],
         policy=policy_egm[1],
         exog_grid=np.append(0, exog_savings_grid),
-        tuning_params=tuning_params,
     )
 
     endog_grid_org, policy_org, value_org = fast_upper_envelope_wrapper_org(
@@ -212,19 +188,6 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         :,
         ~np.isnan(_value_fedor).any(axis=0),
     ]
-    utility_kwargs = {
-        "choice": state_choice_vec["choice"],
-        "params": params,
-    }
-
-    n_constrained_points_to_add = int(0.1 * len(policy_egm[0]))
-    n_final_wealth_grid = int(1.2 * (len(policy_egm[0])))
-    tuning_params = {
-        "n_final_wealth_grid": n_final_wealth_grid,
-        "jump_thresh": 2,
-        "n_constrained_points_to_add": n_constrained_points_to_add,
-        "n_points_to_scan": 10,
-    }
 
     endog_grid_fues, policy_fues, value_fues = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
@@ -233,9 +196,8 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         exog_grid=np.append(0, exog_savings_grid),
         expected_value_zero_savings=value_egm[1, 0],
         utility_function=utility_crra,
-        utility_kwargs=utility_kwargs,
+        utility_args=(state_choice_vec["choice"], params),
         discount_factor=params["beta"],
-        tuning_params=tuning_params,
     )
 
     wealth_max_to_test = np.max(endog_grid_fues[~np.isnan(endog_grid_fues)]) + 100
