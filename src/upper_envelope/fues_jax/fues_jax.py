@@ -23,14 +23,24 @@ from upper_envelope.math_funcs import (
 )
 
 
+@partial(
+    jax.jit,
+    static_argnames=[
+        "value_function",
+        "n_constrained_points_to_add",
+        "n_final_wealth_grid",
+        "jump_thresh",
+        "n_points_to_scan",
+    ],
+)
 def fast_upper_envelope_wrapper(
     endog_grid: jnp.ndarray,
     policy: jnp.ndarray,
     value: jnp.ndarray,
     expected_value_zero_savings: float,
-    utility_function: Callable,
-    utility_kwargs: Dict,
-    disc_factor: float,
+    value_function: Callable,
+    value_function_args: Optional[Tuple] = (),
+    value_function_kwargs: Optional[Dict] = {},
     n_constrained_points_to_add=None,
     n_final_wealth_grid=None,
     jump_thresh=2,
@@ -107,12 +117,8 @@ def fast_upper_envelope_wrapper(
         min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
     )[:-1]
     # Compute closed form values
-    values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
-        grid_points_to_add,
-        expected_value_zero_savings,
-        utility_function,
-        utility_kwargs,
-        disc_factor,
+    values_to_add = vmap(_compute_value, in_axes=(0, None, None, None))(
+        grid_points_to_add, value_function, value_function_args, value_function_kwargs
     )
 
     # Now determine if n_constrained_points_to_addwe actually had to extend the grid.
@@ -146,6 +152,9 @@ def fast_upper_envelope_wrapper(
     )
 
 
+@partial(
+    jax.jit, static_argnames=["n_final_wealth_grid", "jump_thresh", "n_points_to_scan"]
+)
 def fast_upper_envelope(
     endog_grid: jnp.ndarray,
     value: jnp.ndarray,
@@ -809,10 +818,11 @@ def select_and_calculate_intersection(
 
 
 def _compute_value(
-    consumption, next_period_value, utility_function, utility_kwargs, discount_factor
+    consumption, value_function, value_function_args, value_function_kwargs
 ):
-    utility = utility_function(
-        consumption=consumption,
-        **utility_kwargs,
+    value = value_function(
+        consumption,
+        *value_function_args,
+        **value_function_kwargs,
     )
-    return utility + discount_factor * next_period_value
+    return value

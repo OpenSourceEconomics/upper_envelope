@@ -92,18 +92,22 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
     value_egm = np.genfromtxt(
         TEST_RESOURCES_DIR / f"upper_envelope_period_tests/val{period}.csv",
         delimiter=",",
+        dtype=float,
     )
     policy_egm = np.genfromtxt(
         TEST_RESOURCES_DIR / f"upper_envelope_period_tests/pol{period}.csv",
         delimiter=",",
+        dtype=float,
     )
     value_refined_fedor = np.genfromtxt(
         TEST_RESOURCES_DIR / f"upper_envelope_period_tests/expec_val{period}.csv",
         delimiter=",",
+        dtype=float,
     )
     policy_refined_fedor = np.genfromtxt(
         TEST_RESOURCES_DIR / f"upper_envelope_period_tests/expec_pol{period}.csv",
         delimiter=",",
+        dtype=float,
     )
     policy_expected = policy_refined_fedor[
         :, ~np.isnan(policy_refined_fedor).any(axis=0)
@@ -115,10 +119,15 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
 
     params, _exog_savings_grid, state_choice_vars = setup_model
 
-    utility_kwargs = {
+    value_function_kwargs = {
         "choice": state_choice_vars["choice"],
         "params": params,
     }
+
+    def value_func(consumption, choice, params):
+        return (
+            utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
+        )
 
     (
         endog_grid_refined,
@@ -129,9 +138,8 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        utility_function=utility_crra,
-        utility_kwargs=utility_kwargs,
-        disc_factor=params["beta"],
+        value_function=value_func,
+        value_function_kwargs=value_function_kwargs,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
@@ -244,23 +252,22 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         ~np.isnan(_value_fedor).any(axis=0),
     ]
 
-    utility_kwargs = {
-        "choice": state_choice_vec["choice"],
-        "params": params,
-    }
+    def value_func(consumption, choice, params):
+        return (
+            utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
+        )
 
     (
         endog_grid_fues,
         policy_fues,
         value_fues,
-    ) = jax.jit(fast_upper_envelope_wrapper, static_argnums=(4, 7))(
+    ) = fast_upper_envelope_wrapper(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
         expected_value_zero_savings=value_egm[1, 0],
-        utility_function=utility_crra,
-        utility_kwargs=utility_kwargs,
-        disc_factor=params["beta"],
+        value_function=value_func,
+        value_function_args=(state_choice_vec["choice"], params),
         n_constrained_points_to_add=len(policy_egm[0, 1:]) // 10,
     )
 
