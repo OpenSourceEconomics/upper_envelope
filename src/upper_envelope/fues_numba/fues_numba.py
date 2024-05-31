@@ -165,8 +165,6 @@ def fast_upper_envelope(
         exog_grid (np.ndarray): 1d array containing the exogenous wealth grid
             of shape (n_grid_wealth + 1,).
         jump_thresh (float): Jump detection threshold.
-        lower_bound_wealth (float): Lower bound on wealth.
-
     Returns:
         tuple:
 

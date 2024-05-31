@@ -166,8 +166,8 @@ def fast_upper_envelope(
             of shape (n_grid_wealth + 1,).
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        num_iter (int): Number of iterations to execute the fues. Recommended to use
-            twenty percent more than the actual array size.
+        n_final_wealth_grid (int): Size of final grid. Determines number of
+            iterations for the scan in the fues_jax.
         jump_thresh (float): Jump detection threshold.
 
     Returns:
@@ -239,8 +239,8 @@ def scan_value_function(
             of shape (n_grid_wealth + 1,).
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        num_iter (int): Number of iterations to execute the fues. Recommended to use
-            twenty percent more than the actual array size.
+        n_final_wealth_grid (int): Size of final grid. Determines number of
+            iterations for the scan in the fues_jax.
         jump_thresh (float): Jump detection threshold.
         n_points_to_scan (int): Number of points to scan for suboptimal points.
 
