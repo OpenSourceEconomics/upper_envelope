@@ -14,7 +14,7 @@ from numba import njit
 
 
 @njit
-def fast_upper_envelope_wrapper(
+def fues_numba(
     endog_grid: np.ndarray,
     policy: np.ndarray,
     value: np.ndarray,
@@ -108,7 +108,7 @@ def fast_upper_envelope_wrapper(
     value = np.append(expected_value_zero_savings, value)
     exog_grid = np.append(0, exog_grid)
 
-    endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
+    endog_grid_refined, value_refined, policy_refined = fues_numba_unconstrained(
         endog_grid,
         value,
         policy,
@@ -142,7 +142,7 @@ def fast_upper_envelope_wrapper(
 
 
 @njit
-def fast_upper_envelope(
+def fues_numba_unconstrained(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,

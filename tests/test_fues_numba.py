@@ -3,9 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import upper_envelope as upenv
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.fues_numba.fues_numba import fast_upper_envelope
-from upper_envelope.fues_numba.fues_numba import fast_upper_envelope_wrapper
 
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
 from tests.utils.interpolation import interpolate_single_policy_and_value_on_wealth_grid
@@ -94,7 +93,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
             utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
         )
 
-    endog_grid_refined, policy_refined, value_refined = fast_upper_envelope_wrapper(
+    endog_grid_refined, policy_refined, value_refined = upenv.fues_numba(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],
@@ -141,7 +140,7 @@ def test_fast_upper_envelope_against_org_fues(setup_model):
 
     _params, state_choice_vec, exog_savings_grid = setup_model
 
-    endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
+    endog_grid_refined, value_refined, policy_refined = upenv.fues_numba_unconstrained(
         endog_grid=policy_egm[0],
         value=value_egm[1],
         policy=policy_egm[1],
@@ -198,7 +197,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
             utility_crra(consumption, choice, params) + params["beta"] * value_egm[1, 0]
         )
 
-    endog_grid_fues, policy_fues, value_fues = fast_upper_envelope_wrapper(
+    endog_grid_fues, policy_fues, value_fues = upenv.fues_numba(
         endog_grid=policy_egm[0, 1:],
         policy=policy_egm[1, 1:],
         value=value_egm[1, 1:],

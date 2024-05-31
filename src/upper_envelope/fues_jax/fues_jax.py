@@ -33,7 +33,7 @@ from upper_envelope.math_funcs import (
         "n_points_to_scan",
     ],
 )
-def fast_upper_envelope_wrapper(
+def fues_jax(
     endog_grid: jnp.ndarray,
     policy: jnp.ndarray,
     value: jnp.ndarray,
@@ -136,7 +136,7 @@ def fast_upper_envelope_wrapper(
         endog_grid_refined,
         value_refined,
         policy_refined,
-    ) = fast_upper_envelope(
+    ) = fues_jax_unconstrained(
         grid_augmented,
         value_augmented,
         policy_augmented,
@@ -155,7 +155,7 @@ def fast_upper_envelope_wrapper(
 @partial(
     jax.jit, static_argnames=["n_final_wealth_grid", "jump_thresh", "n_points_to_scan"]
 )
-def fast_upper_envelope(
+def fues_jax_unconstrained(
     endog_grid: jnp.ndarray,
     value: jnp.ndarray,
     policy: jnp.ndarray,
