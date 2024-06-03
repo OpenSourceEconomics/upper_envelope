@@ -1,4 +1,5 @@
 """Test the numba implementation of the fast upper envelope scan."""
+
 from pathlib import Path
 
 import numpy as np

@@ -4,6 +4,7 @@ Based on the original MATLAB code by Fedor Iskhakov:
 https://github.com/fediskhakov/dcegm/blob/master/model_retirement.m
 
 """
+
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -317,16 +318,14 @@ def compute_upper_envelope(
 
                     values_all_segments = np.empty((len(segments), 1))
                     for segment in range(len(segments)):
-                        values_all_segments[
-                            segment
-                        ] = _linear_interpolation_with_inserting_missing_values(
-                            x=segments[segment][0],
-                            y=segments[segment][1],
-                            x_new=np.array([intersect_point]),
-                            missing_value=-np.inf,
-                        )[
-                            0
-                        ]
+                        values_all_segments[segment] = (
+                            _linear_interpolation_with_inserting_missing_values(
+                                x=segments[segment][0],
+                                y=segments[segment][1],
+                                x_new=np.array([intersect_point]),
+                                missing_value=-np.inf,
+                            )[0]
+                        )
 
                     index_max_value_intersect = np.where(
                         values_all_segments == values_all_segments.max(axis=0)
