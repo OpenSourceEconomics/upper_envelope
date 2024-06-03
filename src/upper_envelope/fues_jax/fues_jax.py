@@ -115,11 +115,11 @@ def fues_jax(
     # consume everything).
 
     # If there is such a non-concave region, we extend the value function to the left
-    # of the first and calculate the value function there with the supplied value
+    # of the first point and calculate the value function there with the supplied value
     # function.
 
-    # Because of jax we always need to do the same steps. Therefore, if there is
-    # no wealth grid point below the first, we just add nans afterwards.
+    # Because of jax, we always need to perform the same set of computations. Hence,
+    # if there is no wealth grid point below the first, we just add nans thereafter.
     min_id = np.argmin(endog_grid)
     min_wealth_grid = endog_grid[min_id]
 
