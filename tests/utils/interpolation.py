@@ -1,54 +1,59 @@
+from typing import Tuple
+
 import jax.numpy as jnp
 import numpy as np
 
 
 def interpolate_policy_and_value_on_wealth_grid(
-    wealth_beginning_of_period: jnp.ndarray,
-    endog_wealth_grid: jnp.ndarray,
-    policy: jnp.ndarray,
-    value_grid: jnp.ndarray,
+    wealth_beginning_of_period: np.ndarray | jnp.ndarray,
+    endog_wealth_grid: np.ndarray | jnp.ndarray,
+    policy_grid: np.ndarray | jnp.ndarray,
+    value_function_grid: np.ndarray | jnp.ndarray,
 ):
     """Interpolate policy and value functions on the wealth grid.
 
     Args:
-        wealth_beginning_of_period (jnp.ndarray): 1d array of shape (n,) containing the
+        wealth_beginning_of_period (np.ndarray): 1d array of shape (n,) containing the
             begin of period wealth.
-        endog_wealth_grid (jnp.array): 1d array of shape (n,) containing the endogenous
+        endog_wealth_grid (np.array): 1d array of shape (n,) containing the endogenous
             wealth grid.
-        policy_left_grid (jnp.ndarray): 1d array of shape (n,) containing the
-            left policy function corresponding to the endogenous wealth grid.
-        policy_right_grid (jnp.ndarray): 1d array of shape (n,) containing the
-            left policy function corresponding to the endogenous wealth grid.
-        value_grid (jnp.ndarray): 1d array of shape (n,) containing the value function
-            values corresponding to the endogenous wealth grid.
+        policy_grid (np.ndarray): 1d array of shape (n,) containing the
+            policy function corresponding to the endogenous wealth grid.
+        value_function_grid (np.ndarray): 1d array of shape (n,) containing the value
+            function corresponding to the endogenous wealth grid.
 
     Returns:
         tuple:
 
-        - policy_new (jnp.ndarray): 1d array of shape (n,) containing the interpolated
+        - policy_new (np.ndarray): 1d array of shape (n,) containing the interpolated
             policy function values corresponding to the begin of period wealth.
-        - value_new (jnp.ndarray): 1d array of shape (n,) containing the interpolated
+        - value_new (np.ndarray): 1d array of shape (n,) containing the interpolated
             value function values corresponding to the begin of period wealth.
 
     """
+    # Make sure that these are numpy arrays
+    wealth_beginning_of_period = np.asarray(wealth_beginning_of_period)
+    endog_wealth_grid = np.asarray(endog_wealth_grid)
+    policy_grid = np.asarray(policy_grid)
+    value_function_grid = np.asarray(value_function_grid)
     ind_high, ind_low = get_index_high_and_low(
         x=endog_wealth_grid, x_new=wealth_beginning_of_period
     )
 
-    wealth_low = jnp.take(endog_wealth_grid, ind_low)
-    wealth_high = jnp.take(endog_wealth_grid, ind_high)
+    wealth_low = np.take(endog_wealth_grid, ind_low)
+    wealth_high = np.take(endog_wealth_grid, ind_high)
 
     policy_new = linear_interpolation_formula(
-        y_high=jnp.take(policy, ind_high),
-        y_low=jnp.take(policy, ind_low),
+        y_high=np.take(policy_grid, ind_high),
+        y_low=np.take(policy_grid, ind_low),
         x_high=wealth_high,
         x_low=wealth_low,
         x_new=wealth_beginning_of_period,
     )
 
     value_new = linear_interpolation_formula(
-        y_high=jnp.take(value_grid, ind_high),
-        y_low=jnp.take(value_grid, ind_low),
+        y_high=np.take(value_function_grid, ind_high),
+        y_low=np.take(value_function_grid, ind_low),
         x_high=wealth_high,
         x_low=wealth_low,
         x_new=wealth_beginning_of_period,
@@ -58,10 +63,10 @@ def interpolate_policy_and_value_on_wealth_grid(
 
 
 def interpolate_single_policy_and_value_on_wealth_grid(
-    wealth_beginning_of_period: jnp.ndarray,
-    endog_wealth_grid: jnp.ndarray,
-    policy_grid: jnp.ndarray,
-    value_grid: jnp.ndarray,
+    wealth_beginning_of_period: np.ndarray | jnp.ndarray,
+    endog_wealth_grid: np.ndarray | jnp.ndarray,
+    policy_grid: np.ndarray | jnp.ndarray,
+    value_function_grid: np.ndarray | jnp.ndarray,
 ):
     """Interpolate policy and value functions on the wealth grid.
 
@@ -70,44 +75,47 @@ def interpolate_single_policy_and_value_on_wealth_grid(
     in fast_upper_envelope.py.
 
     Args:
-        wealth_beginning_of_period (jnp.ndarray): 1d array of shape (n,) containing the
+        wealth_beginning_of_period (np.ndarray): 1d array of shape (n,) containing the
             begin of period wealth.
-        endog_wealth_grid (jnp.array): 1d array of shape (n,) containing the endogenous
+        endog_wealth_grid (np.ndarray): 1d array of shape (n,) containing the endogenous
             wealth grid.
-        policy_left_grid (jnp.ndarray): 1d array of shape (n,) containing the
-            left policy function corresponding to the endogenous wealth grid.
-        policy_right_grid (jnp.ndarray): 1d array of shape (n,) containing the
-            left policy function corresponding to the endogenous wealth grid.
-        value_grid (jnp.ndarray): 1d array of shape (n,) containing the value function
-            values corresponding to the endogenous wealth grid.
+        policy_grid (np.ndarray): 1d array of shape (n,) containing the
+            policy function corresponding to the endogenous wealth grid.
+        value_function_grid (np.ndarray): 1d array of shape (n,) containing the value
+            function corresponding to the endogenous wealth grid.
 
     Returns:
         tuple:
 
-        - policy_new (jnp.ndarray): 1d array of shape (n,) containing the interpolated
+        - policy_new (np.ndarray): 1d array of shape (n,) containing the interpolated
             policy function values corresponding to the begin of period wealth.
-        - value_new (jnp.ndarray): 1d array of shape (n,) containing the interpolated
+        - value_new (np.ndarray): 1d array of shape (n,) containing the interpolated
             value function values corresponding to the begin of period wealth.
 
     """
+    # Make sure that these are numpy arrays
+    wealth_beginning_of_period = np.asarray(wealth_beginning_of_period)
+    endog_wealth_grid = np.asarray(endog_wealth_grid)
+    policy_grid = np.asarray(policy_grid)
+    value_function_grid = np.asarray(value_function_grid)
     ind_high, ind_low = get_index_high_and_low(
         x=endog_wealth_grid, x_new=wealth_beginning_of_period
     )
 
-    wealth_low = jnp.take(endog_wealth_grid, ind_low)
-    wealth_high = jnp.take(endog_wealth_grid, ind_high)
+    wealth_low = np.take(endog_wealth_grid, ind_low)
+    wealth_high = np.take(endog_wealth_grid, ind_high)
 
     policy_new = linear_interpolation_formula(
-        y_high=jnp.take(policy_grid, ind_high),
-        y_low=jnp.take(policy_grid, ind_low),
+        y_high=np.take(policy_grid, ind_high),
+        y_low=np.take(policy_grid, ind_low),
         x_high=wealth_high,
         x_low=wealth_low,
         x_new=wealth_beginning_of_period,
     )
 
     value_new = linear_interpolation_formula(
-        y_high=jnp.take(value_grid, ind_high),
-        y_low=jnp.take(value_grid, ind_low),
+        y_high=np.take(value_function_grid, ind_high),
+        y_low=np.take(value_function_grid, ind_low),
         x_high=wealth_high,
         x_low=wealth_low,
         x_new=wealth_beginning_of_period,
@@ -117,11 +125,11 @@ def interpolate_single_policy_and_value_on_wealth_grid(
 
 
 def linear_interpolation_formula(
-    y_high: float | jnp.ndarray,
-    y_low: float | jnp.ndarray,
-    x_high: float | jnp.ndarray,
-    x_low: float | jnp.ndarray,
-    x_new: float | jnp.ndarray,
+    y_high: float | np.ndarray,
+    y_low: float | np.ndarray,
+    x_high: float | np.ndarray,
+    x_low: float | np.ndarray,
+    x_new: float | np.ndarray,
 ):
     """Linear interpolation formula."""
     interpolate_dist = x_new - x_low
@@ -131,7 +139,9 @@ def linear_interpolation_formula(
     return interpol_res
 
 
-def get_index_high_and_low(x, x_new):
+def get_index_high_and_low(
+    x: np.ndarray, x_new: np.ndarray | float
+) -> Tuple[np.ndarray, np.ndarray]:
     """Get index of the highest value in x that is smaller than x_new.
 
     Args:
@@ -143,8 +153,8 @@ def get_index_high_and_low(x, x_new):
             case of extrapolation last or first index of not nan element.
 
     """
-    ind_high = jnp.searchsorted(x, x_new).clip(max=(x.shape[0] - 1), min=1)
-    ind_high -= jnp.isnan(x[ind_high]).astype(int)
+    ind_high = np.searchsorted(x, x_new).clip(max=(x.shape[0] - 1), min=1)
+    ind_high -= np.isnan(x[ind_high]).astype(int)
     return ind_high, ind_high - 1
 
 
@@ -153,7 +163,7 @@ def get_index_high_and_low(x, x_new):
 # =====================================================================================
 
 
-def linear_interpolation_with_extrapolation(x, y, x_new):
+def linear_interpolation_with_extrapolation(x, y, x_new) -> np.ndarray:
     """Linear interpolation with extrapolation.
 
     Args:

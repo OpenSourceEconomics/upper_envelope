@@ -6,7 +6,6 @@ https://dx.doi.org/10.2139/ssrn.4181302
 
 """
 from typing import Callable
-from typing import Dict
 from typing import Optional
 from typing import Tuple
 
@@ -14,15 +13,18 @@ import numpy as np
 from numba import njit
 
 
-def fast_upper_envelope_wrapper(
+@njit
+def fues_numba(
     endog_grid: np.ndarray,
     policy: np.ndarray,
     value: np.ndarray,
-    exog_grid: np.ndarray,
-    expected_value_zero_savings: float,
-    utility_function: Callable,
-    utility_kwargs: Dict,
-    discount_factor: float,
+    expected_value_zero_savings: np.ndarray | float,
+    value_function: Callable,
+    value_function_args: Tuple,
+    n_constrained_points_to_add=None,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop suboptimal points and refine the endogenous grid, policy, and value.
 
@@ -54,11 +56,17 @@ def fast_upper_envelope_wrapper(
             containing the current state- and choice-specific policy function.
         value (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific value function.
-        exog_grid (np.ndarray): 1d array of shape (n_grid_wealth,) of the
-            exogenous savings grid.
-        expected_value_zero_savings (float): The agent's expected value given that she
-            saves zero.
-
+        expected_value_zero_savings (np.ndarray | float): The agent's expected value
+            given that she saves zero.
+        value_function (callable): The value function for calculating the value if
+            nothing is saved.
+        value_function_args (Tuple): The positional arguments to be passed to the value
+            function.
+        n_constrained_points_to_add (int): Number of constrained points to add to the
+                left of the first grid point if there is an area with credit-constrain.
+        n_final_wealth_grid (int): Size of final function grid.
+        jump_thresh (float): Jump detection threshold.
+        n_points_to_scan (int): Number of points to scan for suboptimal points.
     Returns:
         tuple:
 
@@ -70,11 +78,7 @@ def fast_upper_envelope_wrapper(
             containing refined state- and choice-specific value function.
 
     """
-    n_grid_wealth = len(endog_grid)
     min_wealth_grid = np.min(endog_grid)
-    # exog_grid = np.append(
-    #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
-    # )
 
     if endog_grid[0] > min_wealth_grid:
         # Non-concave region coincides with credit constraint.
@@ -83,32 +87,44 @@ def fast_upper_envelope_wrapper(
         # Solution: Value function to the left of the first point is analytical,
         # so we just need to add some points to the left of the first grid point.
 
+        # Set default of n_constrained_points_to_add to 10% of the grid size
+        n_constrained_points_to_add = (
+            endog_grid.shape[0] // 10
+            if n_constrained_points_to_add is None
+            else n_constrained_points_to_add
+        )
+
         endog_grid, value, policy = _augment_grids(
             endog_grid=endog_grid,
             value=value,
             policy=policy,
-            expected_value_zero_savings=expected_value_zero_savings,
             min_wealth_grid=min_wealth_grid,
-            n_grid_wealth=n_grid_wealth,
-            utility_function=utility_function,
-            utility_kwargs=utility_kwargs,
-            discount_factor=discount_factor,
+            n_constrained_points_to_add=n_constrained_points_to_add,
+            value_function=value_function,
+            value_function_args=value_function_args,
         )
-        exog_grid = np.append(np.zeros(n_grid_wealth // 10 - 1), exog_grid)
 
     endog_grid = np.append(0, endog_grid)
     policy = np.append(0, policy)
     value = np.append(expected_value_zero_savings, value)
-    exog_grid = np.append(0, exog_grid)
 
-    endog_grid_refined, value_refined, policy_refined = fast_upper_envelope(
-        endog_grid, value, policy, exog_grid, jump_thresh=2
+    endog_grid_refined, value_refined, policy_refined = fues_numba_unconstrained(
+        endog_grid,
+        value,
+        policy,
+        jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
+    )
+
+    # Set default value of final grid size to 1.2 times current if not defined
+    n_final_wealth_grid = (
+        int(1.2 * (len(policy))) if n_final_wealth_grid is None else n_final_wealth_grid
     )
 
     # Fill array with nans to fit 10% extra grid points
-    endog_grid_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
-    policy_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
-    value_refined_with_nans = np.empty(int(1.1 * n_grid_wealth))
+    endog_grid_refined_with_nans = np.empty(n_final_wealth_grid)
+    policy_refined_with_nans = np.empty(n_final_wealth_grid)
+    value_refined_with_nans = np.empty(n_final_wealth_grid)
     endog_grid_refined_with_nans[:] = np.nan
     policy_refined_with_nans[:] = np.nan
     value_refined_with_nans[:] = np.nan
@@ -125,13 +141,12 @@ def fast_upper_envelope_wrapper(
 
 
 @njit
-def fast_upper_envelope(
+def fues_numba_unconstrained(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    exog_grid: np.ndarray,
-    jump_thresh: Optional[float] = 2,
-    lower_bound_wealth: Optional[float] = 1e-10,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
@@ -145,40 +160,27 @@ def fast_upper_envelope(
         exog_grid (np.ndarray): 1d array containing the exogenous wealth grid
             of shape (n_grid_wealth + 1,).
         jump_thresh (float): Jump detection threshold.
-        lower_bound_wealth (float): Lower bound on wealth.
-
     Returns:
         tuple:
 
-        - endog_grid_refined (np.ndarray): 1d array containing the refined endogenous
-            wealth grid of shape (n_grid_clean,), which maps only to the optimal points
-            in the value function.
-        - value_refined (np.ndarray): 1d array containing the refined value function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
-        - policy_refined (np.ndarray): 1d array containing the refined policy function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
+        - endog_grid_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing the refined endogenous wealth grid.
+        - policy_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined consumption policy.
+        - value_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined value function.
 
     """
-    # TODO: determine locations where endogenous grid points are # noqa: T000
-    # equal to the lower bound
-    mask = endog_grid <= lower_bound_wealth
-    if np.any(mask):
-        max_value_lower_bound = np.nanmax(value[mask])
-        mask &= value < max_value_lower_bound
-        value[mask] = np.nan
 
     endog_grid = endog_grid[np.where(~np.isnan(value))[0]]
     policy = policy[np.where(~np.isnan(value))]
-    exog_grid = exog_grid[np.where(~np.isnan(value))[0]]
     value = value[np.where(~np.isnan(value))]
 
     idx_sort = np.argsort(endog_grid, kind="mergesort")
     value = np.take(value, idx_sort)
     policy = np.take(policy, idx_sort)
-    exog_grid = np.take(exog_grid, idx_sort)
     endog_grid = np.take(endog_grid, idx_sort)
+    exog_grid = endog_grid - policy
 
     (
         value_clean_with_nans,
@@ -190,7 +192,7 @@ def fast_upper_envelope(
         policy=policy,
         exog_grid=exog_grid,
         jump_thresh=jump_thresh,
-        n_points_to_scan=10,
+        n_points_to_scan=n_points_to_scan,
     )
 
     endog_grid_refined = endog_grid_clean_with_nans[
@@ -208,7 +210,7 @@ def scan_value_function(
     value: np.ndarray,
     policy: np.ndarray,
     exog_grid: np.ndarray,
-    jump_thresh: float,
+    jump_thresh: Optional[float] = 2,
     n_points_to_scan: Optional[int] = 0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Scan the value function to remove suboptimal points and add intersection points.
@@ -732,16 +734,15 @@ def _append_index(x_array: np.ndarray, m: int):
     return x_array
 
 
+@njit
 def _augment_grids(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    expected_value_zero_savings: float,
     min_wealth_grid: float,
-    n_grid_wealth: int,
-    utility_function: Callable,
-    utility_kwargs: Dict[str, float],
-    discount_factor: float,
+    n_constrained_points_to_add: int,
+    value_function: Callable,
+    value_function_args: Tuple,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extends the endogenous wealth grid, value, and policy functions to the left.
 
@@ -778,14 +779,13 @@ def _augment_grids(
 
     """
     grid_points_to_add = np.linspace(
-        min_wealth_grid, endog_grid[0], n_grid_wealth // 10
+        min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
     )[:-1]
 
-    utility = utility_function(
-        consumption=grid_points_to_add,
-        **utility_kwargs,
-    )
-    values_to_add = utility + discount_factor * expected_value_zero_savings
+    values_to_add = np.empty_like(grid_points_to_add)
+
+    for i, grid_point in enumerate(grid_points_to_add):
+        values_to_add[i] = value_function(grid_point, *value_function_args)
 
     grid_augmented = np.append(grid_points_to_add, endog_grid)
     value_augmented = np.append(values_to_add, value)

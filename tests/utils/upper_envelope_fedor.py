@@ -20,7 +20,7 @@ def upper_envelope(
     policy: np.ndarray,
     value: np.ndarray,
     exog_grid: np.ndarray,
-    state_choice_vec: np.ndarray,
+    state_choice_vec: Dict,
     params: Dict[str, float],
     compute_utility: Callable,
 ) -> Tuple[np.ndarray, np.ndarray]:

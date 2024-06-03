@@ -23,14 +23,28 @@ from upper_envelope.math_funcs import (
 )
 
 
-def fast_upper_envelope_wrapper(
+@partial(
+    jax.jit,
+    static_argnames=[
+        "value_function",
+        "n_constrained_points_to_add",
+        "n_final_wealth_grid",
+        "jump_thresh",
+        "n_points_to_scan",
+    ],
+)
+def fues_jax(
     endog_grid: jnp.ndarray,
     policy: jnp.ndarray,
     value: jnp.ndarray,
-    expected_value_zero_savings: float,
-    utility_function: Callable,
-    utility_kwargs: Dict,
-    disc_factor: float,
+    expected_value_zero_savings: jnp.ndarray | float,
+    value_function: Callable,
+    value_function_args: Optional[Tuple] = (),
+    value_function_kwargs: Optional[Dict] = {},
+    n_constrained_points_to_add=None,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Drop suboptimal points and refines the endogenous grid, policy, and value.
 
@@ -56,59 +70,71 @@ def fast_upper_envelope_wrapper(
     subsequent periods t + 1, t + 2, ..., T under the optimal consumption policy.
 
     Args:
-        endog_grid (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
+        endog_grid (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific endogenous grid.
-        policy (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
+        policy (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific policy function.
-        value (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
+        value (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific value function.
-        expected_value_zero_savings (float): The agent's expected value given that she
-            saves zero.
-        utility_function (callable): The utility function. The first argument is
-            assumed to be consumption.
-        utility_kwargs (dict): The keyword arguments to be passed to the utility
+        expected_value_zero_savings (jnp.ndarray | float): The agent's expected value
+            given that she saves zero.
+        value_function (callable): The value function for calculating the value if
+            nothing is saved.
+        value_function_args (Tuple): The positional arguments to be passed to the value
             function.
+        value_function_kwargs (dict): The keyword arguments to be passed to the value
+            function.
+        n_constrained_points_to_add (int): Number of constrained points to add to the
+            left of the first grid point if there is an area with credit-constrain.
+        n_final_wealth_grid (int): Size of final function grid. Determines number of
+            iterations for the scan in the fues_jax.
+        jump_thresh (float): Jump detection threshold.
+        n_points_to_scan (int): Number of points to scan for suboptimal points.
 
     Returns:
         tuple:
 
-        - endog_grid_refined (np.ndarray): 1d array of shape (1.1 * n_grid_wealth,)
-            containing the refined state- and choice-specific endogenous grid.
-        - policy_refined_with_nans (np.ndarray): 1d array of shape (1.1 * n_grid_wealth)
-            containing refined state- and choice-specificconsumption policy.
-        - value_refined_with_nans (np.ndarray): 1d array of shape (1.1 * n_grid_wealth)
-            containing refined state- and choice-specific value function.
+        - endog_grid_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing the refined endogenous wealth grid.
+        - policy_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined consumption policy.
+        - value_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined value function.
 
     """
+    # Set default of n_constrained_points_to_add to 10% of the grid size
+    n_constrained_points_to_add = (
+        endog_grid.shape[0] // 10
+        if n_constrained_points_to_add is None
+        else n_constrained_points_to_add
+    )
+
+    # Check if a non-concave region coincides with the credit constrained region.
+    # This happens when there is a non-monotonicity in the endogenous wealth grid
+    # that goes below the first point (the minimal wealth, below it is optimal to
+    # consume everything).
+
+    # If there is such a non-concave region, we extend the value function to the left
+    # of the first point and calculate the value function there with the supplied value
+    # function.
+
+    # Because of jax, we always need to perform the same set of computations. Hence,
+    # if there is no wealth grid point below the first, we just add nans thereafter.
     min_id = np.argmin(endog_grid)
     min_wealth_grid = endog_grid[min_id]
-    # These tuning parameters should be set outside. Don't want to touch solve.py now
-    points_to_add = len(endog_grid) // 10
-    num_iter = int(1.2 * value.shape[0])
-    jump_thresh = 2
-    # Non-concave region coincides with credit constraint.
-    # This happens when there is a non-monotonicity in the endogenous wealth grid
-    # that goes below the first point.
-    # Solution: Value function to the left of the first point is analytical,
-    # so we just need to add some points to the left of the first grid point.
-    # We do that independent of whether the condition is fulfilled or not.
-    # If the condition is not fulfilled this is points_to_add times the same point.
 
     # This is the condition, which we do not use at the moment.
     # closed_form_cond = min_wealth_grid < endog_grid[0]
-    grid_points_to_add = jnp.linspace(min_wealth_grid, endog_grid[0], points_to_add)[
-        :-1
-    ]
+    grid_points_to_add = jnp.linspace(
+        min_wealth_grid, endog_grid[0], n_constrained_points_to_add + 1
+    )[:-1]
     # Compute closed form values
-    values_to_add = vmap(_compute_value, in_axes=(0, None, None, None, None))(
-        grid_points_to_add,
-        expected_value_zero_savings,
-        utility_function,
-        utility_kwargs,
-        disc_factor,
+    values_to_add = vmap(_compute_value, in_axes=(0, None, None, None))(
+        grid_points_to_add, value_function, value_function_args, value_function_kwargs
     )
 
-    # Now determine if we actually had to extend the grid. If not, we just add nans.
+    # Now determine if we actually had to extend the grid.
+    # If not, we just add nans.
     no_need_to_add = min_id == 0
     multiplikator = jax.lax.select(no_need_to_add, jnp.nan, 1.0)
     grid_points_to_add *= multiplikator
@@ -122,13 +148,14 @@ def fast_upper_envelope_wrapper(
         endog_grid_refined,
         value_refined,
         policy_refined,
-    ) = fast_upper_envelope(
+    ) = fues_jax_unconstrained(
         grid_augmented,
         value_augmented,
         policy_augmented,
         expected_value_zero_savings,
-        num_iter=num_iter,
+        n_final_wealth_grid=n_final_wealth_grid,
         jump_thresh=jump_thresh,
+        n_points_to_scan=n_points_to_scan,
     )
     return (
         endog_grid_refined,
@@ -137,50 +164,49 @@ def fast_upper_envelope_wrapper(
     )
 
 
-def fast_upper_envelope(
+@partial(
+    jax.jit, static_argnames=["n_final_wealth_grid", "jump_thresh", "n_points_to_scan"]
+)
+def fues_jax_unconstrained(
     endog_grid: jnp.ndarray,
     value: jnp.ndarray,
     policy: jnp.ndarray,
     expected_value_zero_savings: float,
-    num_iter: int,
-    jump_thresh: Optional[float] = 2,
+    n_final_wealth_grid=None,
+    jump_thresh=2,
+    n_points_to_scan=10,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Remove suboptimal points from the endogenous grid, policy, and value function.
 
     Args:
-        endog_grid (np.ndarray): 1d array containing the unrefined endogenous wealth
-            grid of shape (n_grid_wealth + 1,).
-        value (np.ndarray): 1d array containing the unrefined value correspondence
-            of shape (n_grid_wealth + 1,).
-        policy (np.ndarray): 1d array containing the unrefined policy correspondence
-            of shape (n_grid_wealth + 1,).
-        expected_value_zero_savings (float): The agent's expected value given that she
-            saves zero.
-        num_iter (int): Number of iterations to execute the fues. Recommended to use
-            twenty percent more than the actual array size.
+        endog_grid (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
+            containing the current state- and choice-specific endogenous grid.
+        policy (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
+            containing the current state- and choice-specific policy function.
+        value (jnp.ndarray): 1d array of shape (n_grid_wealth + 1,)
+            containing the current state- and choice-specific value function.
+        expected_value_zero_savings (jnp.ndarray | float): The agent's expected value
+            given that she saves zero.
+        n_final_wealth_grid (int): Size of final function grid. Determines number of
+            iterations for the scan in the fues_jax.
         jump_thresh (float): Jump detection threshold.
+        n_points_to_scan (int): Number of points to scan for suboptimal points.
 
     Returns:
         tuple:
 
-        - endog_grid_refined (np.ndarray): 1d array containing the refined endogenous
-            wealth grid of shape (n_grid_clean,), which maps only to the optimal points
-            in the value function.
-        - value_refined (np.ndarray): 1d array containing the refined value function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
-        - policy_refined (np.ndarray): 1d array containing the refined policy function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
+        - endog_grid_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing the refined endogenous wealth grid.
+        - policy_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined consumption policy.
+        - value_refined (jnp.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined value function.
 
     """
-    # Comment by Akshay: Determine locations where endogenous grid points are
-    # equal to the lower bound. Not relevant for us.
-    # mask = endog_grid <= lower_bound_wealth
-    # if jnp.any(mask):
-    #     max_value_lower_bound = jnp.nanmax(value[mask])
-    #     mask &= value < max_value_lower_bound
-    #     value[mask] = jnp.nan
+    # Set default value of final grid size to 1.2 times current if not defined
+    n_final_wealth_grid = (
+        int(1.2 * (len(policy))) if n_final_wealth_grid is None else n_final_wealth_grid
+    )
 
     idx_sort = jnp.argsort(endog_grid)
     value = jnp.take(value, idx_sort)
@@ -196,9 +222,9 @@ def fast_upper_envelope(
         value=value,
         policy=policy,
         expected_value_zero_savings=expected_value_zero_savings,
-        num_iter=num_iter,
+        n_final_wealth_grid=n_final_wealth_grid,
         jump_thresh=jump_thresh,
-        n_points_to_scan=10,
+        n_points_to_scan=n_points_to_scan,
     )
 
     return endog_grid_refined, value_refined, policy_refined
@@ -209,7 +235,7 @@ def scan_value_function(
     value: jnp.ndarray,
     policy: jnp.ndarray,
     expected_value_zero_savings,
-    num_iter: int,
+    n_final_wealth_grid: int,
     jump_thresh: float,
     n_points_to_scan: Optional[int] = 0,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
@@ -224,8 +250,8 @@ def scan_value_function(
             of shape (n_grid_wealth + 1,).
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
-        num_iter (int): Number of iterations to execute the fues. Recommended to use
-            twenty percent more than the actual array size.
+        n_final_wealth_grid (int): Size of final grid. Determines number of
+            iterations for the scan in the fues_jax.
         jump_thresh (float): Jump detection threshold.
         n_points_to_scan (int): Number of points to scan for suboptimal points.
 
@@ -281,7 +307,7 @@ def scan_value_function(
         partial_body,
         carry_init,
         xs=None,
-        length=num_iter,
+        length=n_final_wealth_grid,
     )
     result_arrays, sort_index = result
     value, policy, endog_grid = result_arrays
@@ -794,10 +820,11 @@ def select_and_calculate_intersection(
 
 
 def _compute_value(
-    consumption, next_period_value, utility_function, utility_kwargs, discount_factor
+    consumption, value_function, value_function_args, value_function_kwargs
 ):
-    utility = utility_function(
-        consumption=consumption,
-        **utility_kwargs,
+    value = value_function(
+        consumption,
+        *value_function_args,
+        **value_function_kwargs,
     )
-    return utility + discount_factor * next_period_value
+    return value
