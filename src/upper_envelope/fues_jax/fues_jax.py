@@ -109,13 +109,17 @@ def fues_jax(
         else n_constrained_points_to_add
     )
 
-    # Non-concave region coincides with credit constraint.
+    # Check if a non-concave region coincides with the credit constrained region.
     # This happens when there is a non-monotonicity in the endogenous wealth grid
-    # that goes below the first point.
-    # Solution: Value function to the left of the first point is analytical,
-    # so we just need to add some points to the left of the first grid point.
-    # We do that independent of whether the condition is fulfilled or not.
-    # If the condition is not fulfilled this is points_to_add times the same point.
+    # that goes below the first point (the minimal wealth, below it is optimal to
+    # consume everything).
+
+    # If there is such a non-concave region, we extend the value function to the left
+    # of the first and calculate the value function there with the supplied value
+    # function.
+
+    # Because of jax we always need to do the same steps. Therefore, if there is
+    # no wealth grid point below the first, we just add nans afterwards.
     min_id = np.argmin(endog_grid)
     min_wealth_grid = endog_grid[min_id]
 
