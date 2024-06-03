@@ -130,16 +130,16 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         policy_refined,
         value_refined,
     ) = upenv.fues_jax(
-        endog_grid=policy_egm[0, 1:],
-        policy=policy_egm[1, 1:],
-        value=value_egm[1, 1:],
+        endog_grid=jnp.asarray(policy_egm[0, 1:]),
+        policy=jnp.asarray(policy_egm[1, 1:]),
+        value=jnp.asarray(value_egm[1, 1:]),
         expected_value_zero_savings=value_egm[1, 0],
         value_function=value_func,
         value_function_kwargs=value_function_kwargs,
     )
 
     wealth_max_to_test = np.max(endog_grid_refined[~np.isnan(endog_grid_refined)]) + 100
-    wealth_grid_to_test = jnp.linspace(
+    wealth_grid_to_test = np.linspace(
         endog_grid_refined[1], wealth_max_to_test, 1000, dtype=float
     )
 
@@ -257,9 +257,9 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         policy_fues,
         value_fues,
     ) = upenv.fues_jax(
-        endog_grid=policy_egm[0, 1:],
-        policy=policy_egm[1, 1:],
-        value=value_egm[1, 1:],
+        endog_grid=jnp.asarray(policy_egm[0, 1:]),
+        policy=jnp.asarray(policy_egm[1, 1:]),
+        value=jnp.asarray(value_egm[1, 1:]),
         expected_value_zero_savings=value_egm[1, 0],
         value_function=value_func,
         value_function_args=(state_choice_vec["choice"], params),
@@ -296,8 +296,8 @@ def test_back_and_forward_scan_wrapper_direction_flag():
             endog_grid_to_scan_from=1.2,
             policy_to_scan_from=0.7,
             endog_grid=1,
-            value=np.arange(2, 5),
-            policy=np.arange(1, 4),
+            value=jnp.arange(2, 5),
+            policy=jnp.arange(1, 4),
             idx_to_scan_from=2,
             n_points_to_scan=3,
             is_scan_needed=False,

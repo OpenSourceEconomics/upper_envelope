@@ -1,13 +1,14 @@
 from typing import Tuple
 
+import jax.numpy as jnp
 import numpy as np
 
 
 def interpolate_policy_and_value_on_wealth_grid(
-    wealth_beginning_of_period: np.ndarray,
-    endog_wealth_grid: np.ndarray,
-    policy_grid: np.ndarray,
-    value_function_grid: np.ndarray,
+    wealth_beginning_of_period: np.ndarray | jnp.ndarray,
+    endog_wealth_grid: np.ndarray | jnp.ndarray,
+    policy_grid: np.ndarray | jnp.ndarray,
+    value_function_grid: np.ndarray | jnp.ndarray,
 ):
     """Interpolate policy and value functions on the wealth grid.
 
@@ -62,10 +63,10 @@ def interpolate_policy_and_value_on_wealth_grid(
 
 
 def interpolate_single_policy_and_value_on_wealth_grid(
-    wealth_beginning_of_period: np.ndarray,
-    endog_wealth_grid: np.ndarray,
-    policy_grid: np.ndarray,
-    value_function_grid: np.ndarray,
+    wealth_beginning_of_period: np.ndarray | jnp.ndarray,
+    endog_wealth_grid: np.ndarray | jnp.ndarray,
+    policy_grid: np.ndarray | jnp.ndarray,
+    value_function_grid: np.ndarray | jnp.ndarray,
 ):
     """Interpolate policy and value functions on the wealth grid.
 
