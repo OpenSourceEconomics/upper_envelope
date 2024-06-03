@@ -167,10 +167,10 @@ def linear_interpolation_with_extrapolation(x, y, x_new) -> np.ndarray:
     """Linear interpolation with extrapolation.
 
     Args:
-        x : 1d array of shape (n,) containing the x-values.
-        y : 1d array of shape (n,) containing the y-values
+        x (np.ndarray): 1d array of shape (n,) containing the x-values.
+        y (np.ndarray): 1d array of shape (n,) containing the y-values
             corresponding to the x-values.
-        x_new: 1d array of shape (m,) or float containing
+        x_new (np.ndarray or float): 1d array of shape (m,) or float containing
             the new x-values at which to evaluate the interpolation function.
 
     Returns:
