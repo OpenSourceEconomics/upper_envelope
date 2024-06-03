@@ -19,7 +19,7 @@ def fues_numba(
     policy: np.ndarray,
     value: np.ndarray,
     exog_grid: np.ndarray,
-    expected_value_zero_savings: float,
+    expected_value_zero_savings: np.ndarray | float,
     value_function: Callable,
     value_function_args: Tuple,
     n_constrained_points_to_add=None,
@@ -74,9 +74,6 @@ def fues_numba(
 
     """
     min_wealth_grid = np.min(endog_grid)
-    # exog_grid = np.append(
-    #     0, np.linspace(min_wealth_grid, endog_grid[-1], n_grid_wealth - 1)
-    # )
 
     if endog_grid[0] > min_wealth_grid:
         # Non-concave region coincides with credit constraint.
@@ -176,13 +173,6 @@ def fues_numba_unconstrained(
             the optimal points are kept.
 
     """
-    # TODO: determine locations where endogenous grid points are # noqa: T000
-    # equal to the lower bound
-    # mask = endog_grid <= tuning_params["lower_bound_wealth"]
-    # if np.any(mask):
-    #     max_value_lower_bound = np.nanmax(value[mask])
-    #     mask &= value < max_value_lower_bound
-    #     value[mask] = np.nan
 
     endog_grid = endog_grid[np.where(~np.isnan(value))[0]]
     policy = policy[np.where(~np.isnan(value))]

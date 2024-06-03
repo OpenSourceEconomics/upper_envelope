@@ -157,8 +157,8 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
     ) = interpolate_policy_and_value_on_wealth_grid(
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_refined,
-        policy=policy_refined,
-        value_grid=value_refined,
+        policy_grid=policy_refined,
+        value_function_grid=value_refined,
     )
 
     aaae(value_calc_interp, value_expec_interp)
@@ -203,8 +203,8 @@ def test_fast_upper_envelope_against_numba(setup_model):
     ) = interpolate_policy_and_value_on_wealth_grid(
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_refined,
-        policy=policy_refined,
-        value_grid=value_refined,
+        policy_grid=policy_refined,
+        value_function_grid=value_refined,
     )
 
     (
@@ -213,8 +213,8 @@ def test_fast_upper_envelope_against_numba(setup_model):
     ) = interpolate_policy_and_value_on_wealth_grid(
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_org,
-        policy=policy_org,
-        value_grid=value_org,
+        policy_grid=policy_org,
+        value_function_grid=value_org,
     )
 
     aaae(value_calc_interp_calc, value_calc_interp_org)
@@ -280,8 +280,8 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
     policy_interp, value_interp = interpolate_policy_and_value_on_wealth_grid(
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_fues,
-        policy=policy_fues,
-        value_grid=value_fues,
+        policy_grid=policy_fues,
+        value_function_grid=value_fues,
     )
     aaae(value_interp, value_expec_interp)
     aaae(policy_interp, policy_expec_interp)

@@ -29,7 +29,7 @@ def utility_crra(consumption: np.array, choice: int, params: dict) -> np.array:
             (ii) of shape (n_grid_wealth,) when called by
             :func:`~dcgm.call_egm_step.get_current_period_value`.
         choice (int): Choice of the agent, e.g. 0 = "retirement", 1 = "working".
-        params_dict (dict): Dictionary containing model parameters.
+        params (dict): Dictionary containing model parameters.
             Relevant here is the CRRA coefficient theta.
 
     Returns:
@@ -123,7 +123,7 @@ def test_fast_upper_envelope_wrapper(period, setup_model):
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_refined,
         policy_grid=policy_refined,
-        value_grid=value_refined,
+        value_function_grid=value_refined,
     )
 
     aaae(value_calc_interp, value_expec_interp)
@@ -221,7 +221,7 @@ def test_fast_upper_envelope_against_fedor(period, setup_model):
         wealth_beginning_of_period=wealth_grid_to_test,
         endog_wealth_grid=endog_grid_fues,
         policy_grid=policy_fues,
-        value_grid=value_fues,
+        value_function_grid=value_fues,
     )
     aaae(value_interp, value_expec_interp)
     aaae(policy_interp, policy_expec_interp)
