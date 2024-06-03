@@ -178,7 +178,6 @@ def test_fast_upper_envelope_against_numba(setup_model):
         endog_grid=policy_egm[0],
         value=value_egm[1],
         policy=policy_egm[1],
-        exog_grid=np.append(0, exog_savings_grid),
     )
 
     (

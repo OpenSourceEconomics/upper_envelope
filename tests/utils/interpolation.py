@@ -30,6 +30,11 @@ def interpolate_policy_and_value_on_wealth_grid(
             value function values corresponding to the begin of period wealth.
 
     """
+    # Make sure that these are numpy arrays
+    wealth_beginning_of_period = np.asarray(wealth_beginning_of_period)
+    endog_wealth_grid = np.asarray(endog_wealth_grid)
+    policy_grid = np.asarray(policy_grid)
+    value_function_grid = np.asarray(value_function_grid)
     ind_high, ind_low = get_index_high_and_low(
         x=endog_wealth_grid, x_new=wealth_beginning_of_period
     )
@@ -87,6 +92,11 @@ def interpolate_single_policy_and_value_on_wealth_grid(
             value function values corresponding to the begin of period wealth.
 
     """
+    # Make sure that these are numpy arrays
+    wealth_beginning_of_period = np.asarray(wealth_beginning_of_period)
+    endog_wealth_grid = np.asarray(endog_wealth_grid)
+    policy_grid = np.asarray(policy_grid)
+    value_function_grid = np.asarray(value_function_grid)
     ind_high, ind_low = get_index_high_and_low(
         x=endog_wealth_grid, x_new=wealth_beginning_of_period
     )
@@ -128,7 +138,9 @@ def linear_interpolation_formula(
     return interpol_res
 
 
-def get_index_high_and_low(x: np.ndarray, x_new: np.ndarray | float) -> Tuple[int, int]:
+def get_index_high_and_low(
+    x: np.ndarray, x_new: np.ndarray | float
+) -> Tuple[np.ndarray, np.ndarray]:
     """Get index of the highest value in x that is smaller than x_new.
 
     Args:

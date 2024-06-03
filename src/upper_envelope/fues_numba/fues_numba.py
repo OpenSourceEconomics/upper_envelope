@@ -18,7 +18,6 @@ def fues_numba(
     endog_grid: np.ndarray,
     policy: np.ndarray,
     value: np.ndarray,
-    exog_grid: np.ndarray,
     expected_value_zero_savings: np.ndarray | float,
     value_function: Callable,
     value_function_args: Tuple,
@@ -57,8 +56,6 @@ def fues_numba(
             containing the current state- and choice-specific policy function.
         value (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific value function.
-        exog_grid (np.ndarray): 1d array of shape (n_grid_wealth,) of the
-            exogenous savings grid.
         expected_value_zero_savings (float): The agent's expected value given that she
             saves zero.
 
@@ -98,18 +95,15 @@ def fues_numba(
             value_function=value_function,
             value_function_args=value_function_args,
         )
-        exog_grid = np.append(np.zeros(n_constrained_points_to_add), exog_grid)
 
     endog_grid = np.append(0, endog_grid)
     policy = np.append(0, policy)
     value = np.append(expected_value_zero_savings, value)
-    exog_grid = np.append(0, exog_grid)
 
     endog_grid_refined, value_refined, policy_refined = fues_numba_unconstrained(
         endog_grid,
         value,
         policy,
-        exog_grid,
         jump_thresh=jump_thresh,
         n_points_to_scan=n_points_to_scan,
     )
@@ -143,7 +137,6 @@ def fues_numba_unconstrained(
     endog_grid: np.ndarray,
     value: np.ndarray,
     policy: np.ndarray,
-    exog_grid: np.ndarray,
     jump_thresh=2,
     n_points_to_scan=10,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -176,14 +169,13 @@ def fues_numba_unconstrained(
 
     endog_grid = endog_grid[np.where(~np.isnan(value))[0]]
     policy = policy[np.where(~np.isnan(value))]
-    exog_grid = exog_grid[np.where(~np.isnan(value))[0]]
     value = value[np.where(~np.isnan(value))]
 
     idx_sort = np.argsort(endog_grid, kind="mergesort")
     value = np.take(value, idx_sort)
     policy = np.take(policy, idx_sort)
-    exog_grid = np.take(exog_grid, idx_sort)
     endog_grid = np.take(endog_grid, idx_sort)
+    exog_grid = endog_grid - policy
 
     (
         value_clean_with_nans,
