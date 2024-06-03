@@ -133,7 +133,7 @@ def fues_jax(
         grid_points_to_add, value_function, value_function_args, value_function_kwargs
     )
 
-    # Now determine if n_constrained_points_to_addwe actually had to extend the grid.
+    # Now determine if we actually had to extend the grid.
     # If not, we just add nans.
     no_need_to_add = min_id == 0
     multiplikator = jax.lax.select(no_need_to_add, jnp.nan, 1.0)
