@@ -56,9 +56,17 @@ def fues_numba(
             containing the current state- and choice-specific policy function.
         value (np.ndarray): 1d array of shape (n_grid_wealth + 1,)
             containing the current state- and choice-specific value function.
-        expected_value_zero_savings (float): The agent's expected value given that she
-            saves zero.
-
+        expected_value_zero_savings (np.ndarray | float): The agent's expected value
+            given that she saves zero.
+        value_function (callable): The value function for calculating the value if
+            nothing is saved.
+        value_function_args (Tuple): The positional arguments to be passed to the value
+            function.
+        n_constrained_points_to_add (int): Number of constrained points to add to the
+                left of the first grid point if there is an area with credit-constrain.
+        n_final_wealth_grid (int): Size of final function grid.
+        jump_thresh (float): Jump detection threshold.
+        n_points_to_scan (int): Number of points to scan for suboptimal points.
     Returns:
         tuple:
 
@@ -155,15 +163,12 @@ def fues_numba_unconstrained(
     Returns:
         tuple:
 
-        - endog_grid_refined (np.ndarray): 1d array containing the refined endogenous
-            wealth grid of shape (n_grid_clean,), which maps only to the optimal points
-            in the value function.
-        - value_refined (np.ndarray): 1d array containing the refined value function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
-        - policy_refined (np.ndarray): 1d array containing the refined policy function
-            of shape (n_grid_clean,). Overlapping segments have been removed and only
-            the optimal points are kept.
+        - endog_grid_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing the refined endogenous wealth grid.
+        - policy_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined consumption policy.
+        - value_refined (np.ndarray): 1d array of shape (n_final_wealth_grid,)
+            containing refined value function.
 
     """
 
