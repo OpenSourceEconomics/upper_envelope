@@ -7,13 +7,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-import upper_envelope as upenv
 from numpy.testing import assert_array_almost_equal as aaae
-from upper_envelope.fues_jax.check_and_scan_funcs import back_and_forward_scan_wrapper
 
-from tests.utils.interpolation import interpolate_policy_and_value_on_wealth_grid
-from tests.utils.interpolation import linear_interpolation_with_extrapolation
+import upper_envelope as upenv
+from tests.utils.interpolation import (
+    interpolate_policy_and_value_on_wealth_grid,
+    linear_interpolation_with_extrapolation,
+)
 from tests.utils.upper_envelope_fedor import upper_envelope
+from upper_envelope.fues_jax.check_and_scan_funcs import back_and_forward_scan_wrapper
 
 jax.config.update("jax_enable_x64", True)
 

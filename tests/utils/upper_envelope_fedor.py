@@ -5,14 +5,10 @@ https://github.com/fediskhakov/dcegm/blob/master/model_retirement.m
 
 """
 
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Callable, Dict, List, Tuple
 
 import numpy as np
 from scipy.optimize import brenth as root
-
 
 EPS = 2.2204e-16
 
