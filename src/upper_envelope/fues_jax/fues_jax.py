@@ -5,22 +5,19 @@ The original FUES algorithm is based on Loretti I. Dobrescu and Akshay Shanker (
 https://dx.doi.org/10.2139/ssrn.4181302
 
 """
+
 from functools import partial
-from typing import Callable
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
+
 from upper_envelope.fues_jax.check_and_scan_funcs import (
     determine_cases_and_conduct_necessary_scans,
 )
-from upper_envelope.math_funcs import (
-    calc_intersection_and_extrapolate_policy,
-)
+from upper_envelope.math_funcs import calc_intersection_and_extrapolate_policy
 
 
 @partial(
@@ -107,6 +104,13 @@ def fues_jax(
         endog_grid.shape[0] // 10
         if n_constrained_points_to_add is None
         else n_constrained_points_to_add
+    )
+
+    # Set default value of final grid size to 1.2 times current if not defined
+    n_final_wealth_grid = (
+        int(1.2 * endog_grid.shape[0])
+        if n_final_wealth_grid is None
+        else n_final_wealth_grid
     )
 
     # Check if a non-concave region coincides with the credit constrained region.
@@ -205,7 +209,9 @@ def fues_jax_unconstrained(
     """
     # Set default value of final grid size to 1.2 times current if not defined
     n_final_wealth_grid = (
-        int(1.2 * (len(policy))) if n_final_wealth_grid is None else n_final_wealth_grid
+        int(1.2 * endog_grid.shape[0])
+        if n_final_wealth_grid is None
+        else n_final_wealth_grid
     )
 
     idx_sort = jnp.argsort(endog_grid)

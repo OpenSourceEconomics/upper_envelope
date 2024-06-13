@@ -3,6 +3,7 @@ from typing import Tuple
 
 import jax
 from jax import numpy as jnp
+
 from upper_envelope.math_funcs import calc_gradient
 
 

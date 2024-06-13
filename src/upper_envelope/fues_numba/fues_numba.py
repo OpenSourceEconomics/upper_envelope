@@ -5,9 +5,8 @@ The original FUES algorithm is based on Loretti I. Dobrescu and Akshay Shanker (
 https://dx.doi.org/10.2139/ssrn.4181302
 
 """
-from typing import Callable
-from typing import Optional
-from typing import Tuple
+
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 from numba import njit

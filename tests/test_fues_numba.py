@@ -1,14 +1,17 @@
 """Test the numba implementation of the fast upper envelope scan."""
+
 from pathlib import Path
 
 import numpy as np
 import pytest
-import upper_envelope as upenv
 from numpy.testing import assert_array_almost_equal as aaae
 
+import upper_envelope as upenv
 from tests.utils.fast_upper_envelope_org import fast_upper_envelope_wrapper_org
-from tests.utils.interpolation import interpolate_single_policy_and_value_on_wealth_grid
-from tests.utils.interpolation import linear_interpolation_with_extrapolation
+from tests.utils.interpolation import (
+    interpolate_single_policy_and_value_on_wealth_grid,
+    linear_interpolation_with_extrapolation,
+)
 from tests.utils.upper_envelope_fedor import upper_envelope
 
 # Obtain the test directory of the package.
