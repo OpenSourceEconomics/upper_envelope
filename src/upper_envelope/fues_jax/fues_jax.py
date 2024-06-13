@@ -5,22 +5,19 @@ The original FUES algorithm is based on Loretti I. Dobrescu and Akshay Shanker (
 https://dx.doi.org/10.2139/ssrn.4181302
 
 """
+
 from functools import partial
-from typing import Callable
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
+
 from upper_envelope.fues_jax.check_and_scan_funcs import (
     determine_cases_and_conduct_necessary_scans,
 )
-from upper_envelope.math_funcs import (
-    calc_intersection_and_extrapolate_policy,
-)
+from upper_envelope.math_funcs import calc_intersection_and_extrapolate_policy
 
 
 @partial(
